@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  pythia:
+    build:
+      context: ../..
+      dockerfile: deployments/docker/Dockerfile.leann
+      args:
+        VERSION: ${VERSION:-dev}
+        COMMIT: ${COMMIT:-unknown}
+        BUILD_DATE: ${BUILD_DATE:-unknown}
+    ports:
+      - "8080:8080"
+      - "8081:8081"
+    volumes:
+      - pythia-data:/data
+    environment:
+      - PYTHIA_DATA_DIR=/data
+      - PYTHIA_LEANN_URL=http://127.0.0.1:8081
+      - LEANN_MODEL=all-MiniLM-L6-v2
+      - LEANN_DEVICE=cpu
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+    restart: unless-stopped
+
+volumes:
+  pythia-data:

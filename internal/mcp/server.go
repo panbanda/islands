@@ -7,8 +7,10 @@ package mcp
 import (
 	"context"
 	"fmt"
+	"net/http"
 
 	"github.com/jon/pythia/internal/analyzer"
+	"github.com/jon/pythia/pkg/leann"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
@@ -27,6 +29,7 @@ type Server struct {
 	opts     ServerOptions
 	analyzer *analyzer.Analyzer
 	mcp      *server.MCPServer
+	leann    *leann.Client
 }
 
 // NewServer creates a new MCP server.
@@ -37,6 +40,11 @@ func NewServer(opts ServerOptions) (*Server, error) {
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create analyzer: %w", err)
+	}
+
+	leannClient, err := leann.NewClient(leann.ClientOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create LEANN client: %w", err)
 	}
 
 	mcpServer := server.NewMCPServer(
@@ -50,6 +58,7 @@ func NewServer(opts ServerOptions) (*Server, error) {
 		opts:     opts,
 		analyzer: a,
 		mcp:      mcpServer,
+		leann:    leannClient,
 	}
 
 	s.registerTools()
@@ -72,7 +81,38 @@ func (s *Server) serveStdio(ctx context.Context) error {
 
 func (s *Server) serveHTTP(ctx context.Context) error {
 	addr := fmt.Sprintf("%s:%d", s.opts.Host, s.opts.Port)
-	return server.NewSSEServer(s.mcp).Start(addr)
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/health", s.handleHealth)
+
+	sseServer := server.NewSSEServer(s.mcp)
+	mux.Handle("/", sseServer)
+
+	httpServer := &http.Server{
+		Addr:    addr,
+		Handler: mux,
+	}
+
+	go func() {
+		<-ctx.Done()
+		httpServer.Close()
+	}()
+
+	return httpServer.ListenAndServe()
+}
+
+func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	if err := s.leann.Health(ctx); err != nil {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		fmt.Fprintf(w, `{"status":"unhealthy","leann":"%s"}`, err.Error())
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprint(w, `{"status":"healthy","leann":"ok"}`)
 }
 
 func (s *Server) registerTools() {

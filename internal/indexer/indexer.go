@@ -272,6 +272,10 @@ func (idx *Indexer) processFiles(ctx context.Context, indexName string, files []
 		return int(totalChunks.Load()), firstErr
 	}
 
+	if err := idx.leann.BuildIndex(ctx, indexName, true); err != nil {
+		return int(totalChunks.Load()), fmt.Errorf("failed to build LEANN index: %w", err)
+	}
+
 	return int(totalChunks.Load()), nil
 }
 

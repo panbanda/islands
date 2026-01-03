@@ -83,21 +83,28 @@ func (a *Analyzer) Search(ctx context.Context, opts SearchOptions) ([]SearchResu
 		opts.Threshold = 0.5
 	}
 
-	results, err := a.leann.Search(ctx, leann.SearchOptions{
-		Query:     opts.Query,
-		Limit:     opts.Limit,
-		Threshold: opts.Threshold,
-	})
+	var results []leann.SearchResult
+	var err error
+
+	if opts.Index != "" {
+		results, err = a.leann.SearchIndex(ctx, opts.Index, leann.SearchOptions{
+			Query:     opts.Query,
+			Limit:     opts.Limit,
+			Threshold: opts.Threshold,
+		})
+	} else {
+		results, err = a.leann.Search(ctx, leann.SearchOptions{
+			Query:     opts.Query,
+			Limit:     opts.Limit,
+			Threshold: opts.Threshold,
+		})
+	}
 	if err != nil {
 		return nil, fmt.Errorf("search failed: %w", err)
 	}
 
 	var searchResults []SearchResult
 	for _, r := range results {
-		if opts.Index != "" && r.Metadata["index"] != opts.Index {
-			continue
-		}
-
 		searchResults = append(searchResults, SearchResult{
 			File:    r.Metadata["file"],
 			Line:    1,
@@ -112,6 +119,20 @@ func (a *Analyzer) Search(ctx context.Context, opts SearchOptions) ([]SearchResu
 
 // Ask performs a question-answering query over indexed codebases.
 func (a *Analyzer) Ask(ctx context.Context, question string, indexName string) (string, error) {
+	if indexName != "" {
+		result, err := a.leann.Ask(ctx, indexName, question, 5)
+		if err == nil && result != nil {
+			var response strings.Builder
+			response.WriteString("Relevant code snippets:\n\n")
+			response.WriteString(result.Context)
+			response.WriteString("\n\nSources:\n")
+			for _, src := range result.Sources {
+				response.WriteString(fmt.Sprintf("- %s (score: %.2f)\n", src.File, src.Score))
+			}
+			return response.String(), nil
+		}
+	}
+
 	searchResults, err := a.Search(ctx, SearchOptions{
 		Query:     question,
 		Index:     indexName,
@@ -126,16 +147,16 @@ func (a *Analyzer) Ask(ctx context.Context, question string, indexName string) (
 		return "No relevant code found for your question.", nil
 	}
 
-	var context strings.Builder
-	context.WriteString("Relevant code snippets:\n\n")
+	var contextBuilder strings.Builder
+	contextBuilder.WriteString("Relevant code snippets:\n\n")
 	for i, r := range searchResults {
-		context.WriteString(fmt.Sprintf("--- %s (%.2f) ---\n%s\n\n", r.File, r.Score, r.Preview))
+		contextBuilder.WriteString(fmt.Sprintf("--- %s (%.2f) ---\n%s\n\n", r.File, r.Score, r.Preview))
 		if i >= 4 {
 			break
 		}
 	}
 
-	return context.String(), nil
+	return contextBuilder.String(), nil
 }
 
 // GetIndexes returns all available indexes.

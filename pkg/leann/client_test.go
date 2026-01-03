@@ -278,7 +278,7 @@ func TestClientOptions(t *testing.T) {
 	t.Parallel()
 
 	opts := ClientOptions{
-		PythonPath:    "/usr/bin/python3",
+		ServiceURL:    "http://localhost:8081",
 		CacheDir:      "/cache",
 		ModelName:     "custom-model",
 		DeviceType:    "cuda",
@@ -287,7 +287,7 @@ func TestClientOptions(t *testing.T) {
 		PruningFactor: 0.5,
 	}
 
-	assert.Equal(t, "/usr/bin/python3", opts.PythonPath)
+	assert.Equal(t, "http://localhost:8081", opts.ServiceURL)
 	assert.Equal(t, "/cache", opts.CacheDir)
 	assert.Equal(t, "custom-model", opts.ModelName)
 	assert.Equal(t, "cuda", opts.DeviceType)

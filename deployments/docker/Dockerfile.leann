@@ -1,0 +1,139 @@
+# syntax=docker/dockerfile:1
+
+# =============================================================================
+# Pythia with LEANN - Fully Contained Docker Image
+# =============================================================================
+# Multi-stage build that includes:
+# - Go binary (Pythia CLI)
+# - Python runtime with LEANN
+# - Supervisor to manage both services
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Stage 1: Build Go binary
+# -----------------------------------------------------------------------------
+FROM golang:1.23-bookworm AS go-builder
+
+ARG VERSION=dev
+ARG COMMIT=unknown
+ARG BUILD_DATE=unknown
+
+WORKDIR /build
+
+# Install git for version info
+RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates
+
+# Copy go mod files first for caching
+COPY go.mod go.sum ./
+RUN go mod download && go mod verify
+
+# Copy source code
+COPY . .
+
+# Build with CGO disabled for static binary
+RUN CGO_ENABLED=0 GOOS=linux go build \
+    -ldflags="-s -w \
+        -X github.com/jon/pythia/cmd/pythia.Version=${VERSION} \
+        -X github.com/jon/pythia/cmd/pythia.Commit=${COMMIT} \
+        -X github.com/jon/pythia/cmd/pythia.BuildDate=${BUILD_DATE}" \
+    -o /pythia .
+
+# -----------------------------------------------------------------------------
+# Stage 2: Build Python LEANN environment
+# -----------------------------------------------------------------------------
+FROM python:3.11-slim-bookworm AS python-builder
+
+# Install build dependencies for LEANN native extensions
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    cmake \
+    pkg-config \
+    libboost-all-dev \
+    libprotobuf-dev \
+    protobuf-compiler \
+    libzmq3-dev \
+    libabsl-dev \
+    libaio-dev \
+    libomp-dev \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create virtual environment
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Upgrade pip
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+
+# Install LEANN and dependencies
+COPY deployments/docker/leann/requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt
+
+# Pre-download the default embedding model
+RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2')" || true
+
+# -----------------------------------------------------------------------------
+# Stage 3: Runtime image
+# -----------------------------------------------------------------------------
+FROM python:3.11-slim-bookworm AS runtime
+
+# Labels
+LABEL org.opencontainers.image.title="Pythia with LEANN"
+LABEL org.opencontainers.image.description="AI-powered codebase analysis with embedded vector search"
+LABEL org.opencontainers.image.vendor="Jon"
+LABEL org.opencontainers.image.licenses="Apache-2.0"
+LABEL org.opencontainers.image.source="https://github.com/jon/pythia"
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    supervisor \
+    libomp5 \
+    libzmq5 \
+    libprotobuf32 \
+    libboost-filesystem1.74.0 \
+    libboost-program-options1.74.0 \
+    ca-certificates \
+    curl \
+    tini \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# Copy Python virtual environment from builder
+COPY --from=python-builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+
+# Copy Go binary
+COPY --from=go-builder /pythia /usr/local/bin/pythia
+
+# Copy LEANN service and supervisor config
+COPY deployments/docker/leann/service.py /opt/leann/service.py
+COPY deployments/docker/leann/supervisord.conf /etc/supervisor/conf.d/pythia.conf
+
+# Create directories
+RUN mkdir -p /etc/supervisor/conf.d /var/log/supervisor /data/leann /data/indexes
+
+# Environment variables
+ENV PYTHIA_DATA_DIR=/data
+ENV PYTHIA_LEANN_URL=http://127.0.0.1:8081
+ENV LEANN_DATA_DIR=/data/leann
+ENV LEANN_PORT=8081
+ENV LEANN_MODEL=all-MiniLM-L6-v2
+ENV LEANN_DEVICE=cpu
+
+# Expose ports
+EXPOSE 8080 8081
+
+# Volume for persistent data
+VOLUME ["/data"]
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -sf http://localhost:8080/health || curl -sf http://localhost:8081/health || exit 1
+
+# Use tini as init system
+ENTRYPOINT ["/usr/bin/tini", "--"]
+
+# Default command: run supervisor
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/pythia.conf"]

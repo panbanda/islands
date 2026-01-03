@@ -1,0 +1,13 @@
+# LEANN dependencies
+leann>=0.1.0
+
+# Embedding models (required for LEANN)
+sentence-transformers>=2.2.0
+torch>=2.0.0
+
+# HTTP service
+flask>=3.0.0
+gunicorn>=21.0.0
+
+# Utilities
+pydantic>=2.0.0

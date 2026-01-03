@@ -5,11 +5,28 @@ package analyzer
 
 import (
 	"context"
+	"net/http"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func skipIfNoLEANN(t *testing.T) {
+	t.Helper()
+	leannURL := os.Getenv("PYTHIA_LEANN_URL")
+	if leannURL == "" {
+		leannURL = "http://127.0.0.1:8081"
+	}
+	resp, err := http.Get(leannURL + "/health")
+	if err != nil || resp.StatusCode != http.StatusOK {
+		t.Skip("LEANN service not available, skipping integration test")
+	}
+	if resp != nil {
+		resp.Body.Close()
+	}
+}
 
 func TestNew(t *testing.T) {
 	t.Parallel()
@@ -69,6 +86,7 @@ func TestSearchWithDefaults(t *testing.T) {
 
 func TestSearchWithIndex(t *testing.T) {
 	t.Parallel()
+	skipIfNoLEANN(t)
 
 	tempDir := t.TempDir()
 
@@ -109,6 +127,7 @@ func TestAsk(t *testing.T) {
 
 func TestAskWithIndex(t *testing.T) {
 	t.Parallel()
+	skipIfNoLEANN(t)
 
 	tempDir := t.TempDir()
 
