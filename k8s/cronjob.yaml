@@ -1,0 +1,50 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: pythia-sync
+  namespace: pythia
+  labels:
+    app.kubernetes.io/name: pythia
+    app.kubernetes.io/component: sync
+spec:
+  schedule: "*/30 * * * *"  # Every 30 minutes
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: pythia
+          securityContext:
+            runAsUser: 1000
+            runAsGroup: 1000
+            fsGroup: 1000
+          restartPolicy: OnFailure
+          containers:
+            - name: sync
+              image: pythia:latest
+              imagePullPolicy: IfNotPresent
+              command:
+                - pythia
+                - sync
+                - --all
+              envFrom:
+                - configMapRef:
+                    name: pythia-config
+                - secretRef:
+                    name: pythia-secrets
+              volumeMounts:
+                - name: data
+                  mountPath: /data/pythia
+              resources:
+                requests:
+                  memory: "256Mi"
+                  cpu: "100m"
+                limits:
+                  memory: "1Gi"
+                  cpu: "500m"
+          volumes:
+            - name: data
+              persistentVolumeClaim:
+                claimName: pythia-data

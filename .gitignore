@@ -1,21 +1,63 @@
-# Binaries
-pythia
-*.exe
-*.exe~
-*.dll
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
 *.so
-*.dylib
 
-# Test binary
-*.test
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
 
-# Output of the go coverage tool
-*.out
-coverage.out
-coverage.html
+# PyInstaller
+*.manifest
+*.spec
 
-# Dependency directories
-vendor/
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+
+# Translations
+*.mo
+*.pot
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
 
 # IDE
 .idea/
@@ -24,32 +66,36 @@ vendor/
 *.swo
 *~
 
-# OS files
-.DS_Store
-Thumbs.db
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
 
-# Build output
-dist/
-build/
+# ruff
+.ruff_cache/
+
+# Jupyter
+.ipynb_checkpoints
 
 # Local data
+/data/
+*.leann
 .pythia/
 
 # Secrets
-*.env
-.env.*
+*.pem
+*.key
+secrets.yaml
+.env.local
+.env.*.local
 
-# Temporary files
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+*.log
 *.tmp
 *.temp
 tmp/
 temp/
-
-# Log files
-*.log
-
-# GoReleaser
-dist/
-
-# Helm
-*.tgz

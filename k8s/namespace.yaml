@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: pythia
+  labels:
+    app.kubernetes.io/name: pythia
+    app.kubernetes.io/component: codebase-indexer
