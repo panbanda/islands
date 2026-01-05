@@ -23,7 +23,6 @@ RUN uv venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 RUN uv pip install --no-cache-dir .
-RUN uv pip install --no-cache-dir leann
 
 # Production image
 FROM python:3.12-slim
