@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Awaitable, Callable
 from pathlib import Path
-from typing import Callable, Awaitable
 
-from watchdog.events import FileSystemEventHandler, FileSystemEvent
+from watchdog.events import FileSystemEvent, FileSystemEventHandler
 from watchdog.observers import Observer
 
 logger = logging.getLogger(__name__)
@@ -78,9 +78,7 @@ class IndexWatcher:
                 path = Path(event.src_path)
                 repo_path = self._get_repo_path(path)
                 if repo_path:
-                    self._loop.call_soon_threadsafe(
-                        lambda: self._schedule_callback(repo_path)
-                    )
+                    self._loop.call_soon_threadsafe(lambda: self._schedule_callback(repo_path))
 
         self._observer = Observer()
         self._observer.schedule(Handler(), str(self.watch_path), recursive=True)

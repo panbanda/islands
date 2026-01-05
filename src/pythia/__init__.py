@@ -11,10 +11,10 @@ __license__ = "MIT"
 
 from pythia.indexer.service import IndexerService
 from pythia.providers.base import GitProvider
-from pythia.providers.github import GitHubProvider
-from pythia.providers.gitlab import GitLabProvider
 from pythia.providers.bitbucket import BitbucketProvider
 from pythia.providers.gitea import GiteaProvider
+from pythia.providers.github import GitHubProvider
+from pythia.providers.gitlab import GitLabProvider
 
 __all__ = [
     "IndexerService",

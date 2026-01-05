@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
-
-from pythia.mcp.server import PythiaMCPServer
-from pythia.indexer.service import IndexerService, IndexInfo
-from pythia.providers.base import Repository
 from datetime import datetime
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
+
+from pythia.indexer.service import IndexerService, IndexInfo
+from pythia.mcp.server import PythiaMCPServer
+from pythia.providers.base import Repository
 
 
 class TestPythiaMCPServer:
@@ -81,14 +82,16 @@ class TestPythiaMCPServer:
 
     @pytest.mark.asyncio
     async def test_handle_search_with_results(self, mcp_server, mock_indexer):
-        mock_indexer.search = AsyncMock(return_value=[
-            {
-                "repository": "test/repo",
-                "metadata": {"file": "src/main.py"},
-                "score": 0.95,
-                "text": "def main():\n    pass",
-            }
-        ])
+        mock_indexer.search = AsyncMock(
+            return_value=[
+                {
+                    "repository": "test/repo",
+                    "metadata": {"file": "src/main.py"},
+                    "score": 0.95,
+                    "text": "def main():\n    pass",
+                }
+            ]
+        )
 
         result = await mcp_server._handle_search({"query": "main function"})
         assert len(result) == 1
@@ -96,14 +99,16 @@ class TestPythiaMCPServer:
         assert "0.95" in result[0].text
 
     @pytest.mark.asyncio
+    async def test_handle_add_repo_invalid_url(self, mcp_server, mock_indexer):
+        result = await mcp_server._handle_add_repo({"url": "not-a-url"})
+        assert len(result) == 1
+        assert "Invalid URL" in result[0].text
+
+    @pytest.mark.asyncio
     async def test_handle_add_repo_unknown_provider(self, mcp_server, mock_indexer):
         mock_indexer.providers = {}
 
-        result = await mcp_server._handle_add_repo({
-            "provider": "unknown",
-            "owner": "test",
-            "name": "repo",
-        })
+        result = await mcp_server._handle_add_repo({"url": "https://github.com/test/repo"})
         assert len(result) == 1
         assert "not configured" in result[0].text
 

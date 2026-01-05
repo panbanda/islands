@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import AsyncIterator
 
-from pythia.config.settings import Settings, LeannBackend
+from pythia.config.settings import Settings
 from pythia.indexer.repository import RepositoryManager, RepositoryState
 from pythia.providers.base import GitProvider, Repository, WebhookEvent
 from pythia.providers.factory import create_provider
@@ -64,7 +64,9 @@ class IndexerService:
 
     def _get_index_path(self, repo: Repository) -> Path:
         """Get the LEANN index path for a repository."""
-        return self.settings.storage.indexes_path / repo.provider / repo.owner / f"{repo.name}.leann"
+        return (
+            self.settings.storage.indexes_path / repo.provider / repo.owner / f"{repo.name}.leann"
+        )
 
     def _get_index_name(self, repo: Repository) -> str:
         """Get a unique index name for a repository."""
@@ -103,10 +105,34 @@ class IndexerService:
 
         file_count = 0
         code_extensions = {
-            ".py", ".js", ".ts", ".jsx", ".tsx", ".java", ".go", ".rs",
-            ".c", ".cpp", ".h", ".hpp", ".cs", ".rb", ".php", ".swift",
-            ".kt", ".scala", ".sql", ".sh", ".bash", ".yaml", ".yml",
-            ".json", ".toml", ".md", ".rst", ".txt",
+            ".py",
+            ".js",
+            ".ts",
+            ".jsx",
+            ".tsx",
+            ".java",
+            ".go",
+            ".rs",
+            ".c",
+            ".cpp",
+            ".h",
+            ".hpp",
+            ".cs",
+            ".rb",
+            ".php",
+            ".swift",
+            ".kt",
+            ".scala",
+            ".sql",
+            ".sh",
+            ".bash",
+            ".yaml",
+            ".yml",
+            ".json",
+            ".toml",
+            ".md",
+            ".rst",
+            ".txt",
         }
 
         for file_path in state.local_path.rglob("*"):

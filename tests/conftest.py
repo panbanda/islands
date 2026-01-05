@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import asyncio
 import tempfile
+from collections.abc import Generator
 from pathlib import Path
-from typing import AsyncGenerator, Generator
 
 import pytest
 
-from pythia.config.settings import Settings, StorageConfig, ProviderConfig, ProviderType
+from pythia.config.settings import ProviderConfig, ProviderType, Settings, StorageConfig
 from pythia.providers.base import AuthType, ProviderAuth, Repository
 
 

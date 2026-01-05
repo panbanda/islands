@@ -2,12 +2,9 @@
 
 from __future__ import annotations
 
-import json
 import pytest
-from pathlib import Path
 
 from pythia.storage.efs import EFSStorage, IndexMetadata
-from pythia.config.settings import StorageConfig
 
 
 class TestIndexMetadata:

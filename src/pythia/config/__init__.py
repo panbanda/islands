@@ -1,5 +1,5 @@
 """Configuration module for Pythia."""
 
-from pythia.config.settings import Settings, ProviderConfig, StorageConfig
+from pythia.config.settings import ProviderConfig, Settings, StorageConfig
 
 __all__ = ["Settings", "ProviderConfig", "StorageConfig"]

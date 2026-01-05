@@ -5,8 +5,8 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+from collections.abc import AsyncIterator
 from datetime import datetime
-from typing import AsyncIterator
 
 from pythia.providers.base import (
     AuthType,
@@ -62,9 +62,9 @@ class GitHubProvider(GitProvider):
             description=data.get("description"),
             language=data.get("language"),
             size_kb=data.get("size", 0),
-            last_updated=datetime.fromisoformat(
-                data["updated_at"].replace("Z", "+00:00")
-            ) if data.get("updated_at") else None,
+            last_updated=datetime.fromisoformat(data["updated_at"].replace("Z", "+00:00"))
+            if data.get("updated_at")
+            else None,
             is_private=data.get("private", False),
             topics=data.get("topics", []),
         )
@@ -115,21 +115,15 @@ class GitHubProvider(GitProvider):
         repo = await self.get_repository(owner, name)
         return repo.default_branch
 
-    async def get_latest_commit(
-        self, owner: str, name: str, ref: str | None = None
-    ) -> str:
+    async def get_latest_commit(self, owner: str, name: str, ref: str | None = None) -> str:
         """Get the latest commit SHA for a branch or ref."""
         if ref is None:
             ref = await self.get_default_branch(owner, name)
 
-        response = await self._request(
-            "GET", f"/repos/{owner}/{name}/commits/{ref}"
-        )
+        response = await self._request("GET", f"/repos/{owner}/{name}/commits/{ref}")
         return response.json()["sha"]
 
-    async def parse_webhook(
-        self, headers: dict, body: bytes
-    ) -> WebhookEvent | None:
+    async def parse_webhook(self, headers: dict, body: bytes) -> WebhookEvent | None:
         """Parse a GitHub webhook payload."""
         event_type = headers.get("x-github-event")
         if not event_type:
@@ -137,11 +131,14 @@ class GitHubProvider(GitProvider):
 
         if self.webhook_secret:
             signature = headers.get("x-hub-signature-256", "")
-            expected = "sha256=" + hmac.new(
-                self.webhook_secret.encode(),
-                body,
-                hashlib.sha256,
-            ).hexdigest()
+            expected = (
+                "sha256="
+                + hmac.new(
+                    self.webhook_secret.encode(),
+                    body,
+                    hashlib.sha256,
+                ).hexdigest()
+            )
             if not hmac.compare_digest(signature, expected):
                 raise ValueError("Invalid webhook signature")
 

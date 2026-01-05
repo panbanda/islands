@@ -5,8 +5,8 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+from collections.abc import AsyncIterator
 from datetime import datetime
-from typing import AsyncIterator
 
 from pythia.providers.base import (
     AuthType,
@@ -62,9 +62,9 @@ class GiteaProvider(GitProvider):
             description=data.get("description"),
             language=data.get("language"),
             size_kb=data.get("size", 0),
-            last_updated=datetime.fromisoformat(
-                data["updated_at"].replace("Z", "+00:00")
-            ) if data.get("updated_at") else None,
+            last_updated=datetime.fromisoformat(data["updated_at"].replace("Z", "+00:00"))
+            if data.get("updated_at")
+            else None,
             is_private=data.get("private", False),
             topics=data.get("topics", []) or [],
         )
@@ -119,9 +119,7 @@ class GiteaProvider(GitProvider):
         repo = await self.get_repository(owner, name)
         return repo.default_branch
 
-    async def get_latest_commit(
-        self, owner: str, name: str, ref: str | None = None
-    ) -> str:
+    async def get_latest_commit(self, owner: str, name: str, ref: str | None = None) -> str:
         """Get the latest commit SHA for a branch or ref."""
         if ref is None:
             ref = await self.get_default_branch(owner, name)
@@ -132,9 +130,7 @@ class GiteaProvider(GitProvider):
         )
         return response.json()["sha"]
 
-    async def parse_webhook(
-        self, headers: dict, body: bytes
-    ) -> WebhookEvent | None:
+    async def parse_webhook(self, headers: dict, body: bytes) -> WebhookEvent | None:
         """Parse a Gitea webhook payload."""
         event_type = headers.get("x-gitea-event", headers.get("x-gogs-event", ""))
         if not event_type:

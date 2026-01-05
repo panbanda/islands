@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import json
+from collections.abc import AsyncIterator
 from datetime import datetime
-from typing import AsyncIterator
 from urllib.parse import quote_plus
 
 from pythia.providers.base import (
@@ -53,9 +53,9 @@ class GitLabProvider(GitProvider):
             description=data.get("description"),
             language=None,
             size_kb=data.get("statistics", {}).get("repository_size", 0) // 1024,
-            last_updated=datetime.fromisoformat(
-                data["last_activity_at"].replace("Z", "+00:00")
-            ) if data.get("last_activity_at") else None,
+            last_updated=datetime.fromisoformat(data["last_activity_at"].replace("Z", "+00:00"))
+            if data.get("last_activity_at")
+            else None,
             is_private=data.get("visibility") == "private",
             topics=data.get("topics", []),
         )
@@ -109,9 +109,7 @@ class GitLabProvider(GitProvider):
         repo = await self.get_repository(owner, name)
         return repo.default_branch
 
-    async def get_latest_commit(
-        self, owner: str, name: str, ref: str | None = None
-    ) -> str:
+    async def get_latest_commit(self, owner: str, name: str, ref: str | None = None) -> str:
         """Get the latest commit SHA for a branch or ref."""
         project_path = quote_plus(f"{owner}/{name}")
 
@@ -124,9 +122,7 @@ class GitLabProvider(GitProvider):
         )
         return response.json()["id"]
 
-    async def parse_webhook(
-        self, headers: dict, body: bytes
-    ) -> WebhookEvent | None:
+    async def parse_webhook(self, headers: dict, body: bytes) -> WebhookEvent | None:
         """Parse a GitLab webhook payload."""
         event_type = headers.get("x-gitlab-event", "").lower().replace(" ", "_")
         if not event_type:

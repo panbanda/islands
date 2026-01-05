@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
+from unittest.mock import MagicMock, patch
+
 import pytest
-from pathlib import Path
-from unittest.mock import AsyncMock, patch, MagicMock
 
 from pythia.indexer.repository import RepositoryManager, RepositoryState
-from pythia.providers.base import Repository, GitProvider
+from pythia.providers.base import GitProvider
 
 
 class TestRepositoryState:

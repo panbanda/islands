@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import asyncio
 from abc import ABC, abstractmethod
+from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import AsyncIterator
 
 import httpx
 
@@ -126,9 +126,7 @@ class GitProvider(ABC):
 
         self._request_count += 1
 
-    async def _request(
-        self, method: str, path: str, **kwargs
-    ) -> httpx.Response:
+    async def _request(self, method: str, path: str, **kwargs) -> httpx.Response:
         """Make an API request with rate limiting."""
         await self._check_rate_limit()
         client = await self._get_client()
@@ -172,13 +170,9 @@ class GitProvider(ABC):
             return repo.ssh_url
         if self.auth and self.auth.token:
             if "github" in repo.clone_url:
-                return repo.clone_url.replace(
-                    "https://", f"https://{self.auth.token}@"
-                )
+                return repo.clone_url.replace("https://", f"https://{self.auth.token}@")
             if "gitlab" in repo.clone_url:
-                return repo.clone_url.replace(
-                    "https://", f"https://oauth2:{self.auth.token}@"
-                )
+                return repo.clone_url.replace("https://", f"https://oauth2:{self.auth.token}@")
         return repo.clone_url
 
     async def close(self) -> None:

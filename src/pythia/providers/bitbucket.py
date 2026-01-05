@@ -6,8 +6,8 @@ import base64
 import hashlib
 import hmac
 import json
+from collections.abc import AsyncIterator
 from datetime import datetime
-from typing import AsyncIterator
 
 from pythia.providers.base import (
     AuthType,
@@ -71,9 +71,9 @@ class BitbucketProvider(GitProvider):
             description=data.get("description"),
             language=data.get("language"),
             size_kb=data.get("size", 0) // 1024,
-            last_updated=datetime.fromisoformat(
-                data["updated_on"].replace("Z", "+00:00")
-            ) if data.get("updated_on") else None,
+            last_updated=datetime.fromisoformat(data["updated_on"].replace("Z", "+00:00"))
+            if data.get("updated_on")
+            else None,
             is_private=data.get("is_private", False),
             topics=[],
         )
@@ -131,9 +131,7 @@ class BitbucketProvider(GitProvider):
         repo = await self.get_repository(owner, name)
         return repo.default_branch
 
-    async def get_latest_commit(
-        self, owner: str, name: str, ref: str | None = None
-    ) -> str:
+    async def get_latest_commit(self, owner: str, name: str, ref: str | None = None) -> str:
         """Get the latest commit SHA for a branch or ref."""
         if ref is None:
             ref = await self.get_default_branch(owner, name)
@@ -148,16 +146,13 @@ class BitbucketProvider(GitProvider):
             return commits[0]["hash"]
         raise ValueError(f"No commits found for {ref}")
 
-    async def parse_webhook(
-        self, headers: dict, body: bytes
-    ) -> WebhookEvent | None:
+    async def parse_webhook(self, headers: dict, body: bytes) -> WebhookEvent | None:
         """Parse a Bitbucket webhook payload."""
         event_key = headers.get("x-event-key", "")
         if not event_key:
             return None
 
         if self.webhook_secret:
-            hook_uuid = headers.get("x-hook-uuid", "")
             expected = hmac.new(
                 self.webhook_secret.encode(),
                 body,

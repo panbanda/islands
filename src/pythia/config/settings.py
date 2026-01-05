@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 from enum import Enum
 from pathlib import Path
 from typing import Any
@@ -130,8 +129,8 @@ class Settings(BaseSettings):
 
                 with open(path) as f:
                     data = yaml.safe_load(f)
-            except ImportError:
-                raise ImportError("PyYAML is required for YAML config files")
+            except ImportError as err:
+                raise ImportError("PyYAML is required for YAML config files") from err
         else:
             with open(path) as f:
                 data = json.load(f)

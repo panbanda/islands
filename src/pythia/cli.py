@@ -12,8 +12,7 @@ import click
 from rich.console import Console
 from rich.table import Table
 
-from pythia.config.settings import Settings, ProviderConfig, ProviderType
-
+from pythia.config.settings import ProviderConfig, ProviderType, Settings
 
 console = Console()
 
@@ -106,7 +105,6 @@ def add(ctx: click.Context, url: str, token: str | None) -> None:
         https://gitea.example.com/owner/repo
     """
     from pythia.indexer.service import IndexerService
-    from pythia.config.settings import ProviderConfig, ProviderType
 
     settings: Settings = ctx.obj["settings"]
 
@@ -130,7 +128,7 @@ def add(ctx: click.Context, url: str, token: str | None) -> None:
             git_provider = indexer.providers.get(provider)
             if not git_provider:
                 console.print(f"[red]Provider '{provider}' not configured[/red]")
-                console.print(f"[dim]Set PYTHIA_GIT_TOKEN or use --token[/dim]")
+                console.print("[dim]Set PYTHIA_GIT_TOKEN or use --token[/dim]")
                 return
 
             console.print(f"Fetching repository info for {owner}/{name}...")
@@ -221,7 +219,9 @@ def list_indexes(ctx: click.Context) -> None:
                 count += 1
 
             if count == 0:
-                console.print("[yellow]No indexes found. Use 'pythia add' to add repositories.[/yellow]")
+                console.print(
+                    "[yellow]No indexes found. Use 'pythia add' to add repositories.[/yellow]"
+                )
             else:
                 console.print(table)
         finally:

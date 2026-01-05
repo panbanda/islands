@@ -9,11 +9,11 @@ from typing import Any
 
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
-from mcp.types import Tool, TextContent
+from mcp.types import TextContent, Tool
 
+from pythia.cli import parse_repo_url
 from pythia.config.settings import Settings
 from pythia.indexer.service import IndexerService
-from pythia.cli import parse_repo_url
 
 logger = logging.getLogger(__name__)
 
@@ -132,17 +132,24 @@ class PythiaMCPServer:
         """Handle pythia_list tool call."""
         indexes = []
         async for info in self.indexer.list_indexes():
-            indexes.append({
-                "name": info.name,
-                "repository": info.repository.full_name,
-                "provider": info.repository.provider,
-                "file_count": info.file_count,
-                "size_mb": round(info.size_bytes / (1024 * 1024), 2),
-                "updated_at": info.updated_at.isoformat(),
-            })
+            indexes.append(
+                {
+                    "name": info.name,
+                    "repository": info.repository.full_name,
+                    "provider": info.repository.provider,
+                    "file_count": info.file_count,
+                    "size_mb": round(info.size_bytes / (1024 * 1024), 2),
+                    "updated_at": info.updated_at.isoformat(),
+                }
+            )
 
         if not indexes:
-            return [TextContent(type="text", text="No indexes available. Add repositories using pythia_add_repo.")]
+            return [
+                TextContent(
+                    type="text",
+                    text="No indexes available. Add repositories using pythia_add_repo.",
+                )
+            ]
 
         result = "Available Pythia Indexes:\n\n"
         for idx in indexes:
@@ -172,7 +179,11 @@ class PythiaMCPServer:
                 output += f"**File:** {result['metadata']['file']}\n"
             output += f"**Score:** {result.get('score', 0):.4f}\n"
             if "text" in result:
-                text = result["text"][:500] + "..." if len(result.get("text", "")) > 500 else result.get("text", "")
+                text = (
+                    result["text"][:500] + "..."
+                    if len(result.get("text", "")) > 500
+                    else result.get("text", "")
+                )
                 output += f"```\n{text}\n```\n\n"
 
         return [TextContent(type="text", text=output)]
@@ -187,10 +198,12 @@ class PythiaMCPServer:
             return [TextContent(type="text", text=f"Invalid URL: {e}")]
 
         if provider not in self.indexer.providers:
-            return [TextContent(
-                type="text",
-                text=f"Provider '{provider}' is not configured. Available providers: {list(self.indexer.providers.keys())}",
-            )]
+            return [
+                TextContent(
+                    type="text",
+                    text=f"Provider '{provider}' is not configured. Available providers: {list(self.indexer.providers.keys())}",
+                )
+            ]
 
         git_provider = self.indexer.providers[provider]
 
@@ -198,12 +211,14 @@ class PythiaMCPServer:
             repo = await git_provider.get_repository(owner, name)
             state = await self.indexer.add_repository(repo)
 
-            return [TextContent(
-                type="text",
-                text=f"Successfully added and indexed {repo.full_name}\n"
-                     f"Commit: {state.last_commit}\n"
-                     f"Path: {state.local_path}",
-            )]
+            return [
+                TextContent(
+                    type="text",
+                    text=f"Successfully added and indexed {repo.full_name}\n"
+                    f"Commit: {state.last_commit}\n"
+                    f"Path: {state.local_path}",
+                )
+            ]
         except Exception as e:
             return [TextContent(type="text", text=f"Failed to add repository: {e}")]
 
@@ -217,12 +232,14 @@ class PythiaMCPServer:
 
         try:
             state = await self.indexer.sync_repository(info.repository)
-            return [TextContent(
-                type="text",
-                text=f"Synced {info.repository.full_name}\n"
-                     f"Commit: {state.last_commit}\n"
-                     f"Indexed: {state.indexed}",
-            )]
+            return [
+                TextContent(
+                    type="text",
+                    text=f"Synced {info.repository.full_name}\n"
+                    f"Commit: {state.last_commit}\n"
+                    f"Indexed: {state.indexed}",
+                )
+            ]
         except Exception as e:
             return [TextContent(type="text", text=f"Sync failed: {e}")]
 
@@ -251,11 +268,13 @@ class PythiaMCPServer:
         statuses = []
         async for info in self.indexer.list_indexes():
             state = await self.indexer.repository_manager.get_state(info.repository)
-            statuses.append({
-                "name": info.name,
-                "indexed": state.indexed if state else False,
-                "error": state.error if state else None,
-            })
+            statuses.append(
+                {
+                    "name": info.name,
+                    "indexed": state.indexed if state else False,
+                    "error": state.error if state else None,
+                }
+            )
 
         return [TextContent(type="text", text=json.dumps(statuses, indent=2))]
 

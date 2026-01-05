@@ -5,12 +5,11 @@ from __future__ import annotations
 import asyncio
 import logging
 import shutil
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import AsyncIterator
 
-import git
 from git import Repo
 
 from pythia.providers.base import GitProvider, Repository
@@ -132,6 +131,7 @@ class RepositoryManager:
                 return await self.clone_repository(repo)
 
             try:
+
                 def _pull():
                     git_repo = Repo(local_path)
                     origin = git_repo.remote("origin")
@@ -142,17 +142,15 @@ class RepositoryManager:
                 last_commit = await loop.run_in_executor(None, _pull)
 
                 current_state = self._states.get(state_key)
-                needs_reindex = (
-                    current_state is None
-                    or current_state.last_commit != last_commit
-                )
+                needs_reindex = current_state is None or current_state.last_commit != last_commit
 
                 state = RepositoryState(
                     repository=repo,
                     local_path=local_path,
                     last_commit=last_commit,
                     last_synced=datetime.now(),
-                    indexed=not needs_reindex and (current_state.indexed if current_state else False),
+                    indexed=not needs_reindex
+                    and (current_state.indexed if current_state else False),
                     error=None,
                 )
 

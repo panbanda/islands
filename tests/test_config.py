@@ -3,17 +3,16 @@
 from __future__ import annotations
 
 import json
-import pytest
 from pathlib import Path
 
 from pythia.config.settings import (
+    AgentConfig,
+    LeannBackend,
+    LeannConfig,
+    ProviderConfig,
+    ProviderType,
     Settings,
     StorageConfig,
-    ProviderConfig,
-    LeannConfig,
-    AgentConfig,
-    ProviderType,
-    LeannBackend,
 )
 
 
@@ -131,9 +130,7 @@ class TestSettings:
             "debug": True,
             "log_level": "DEBUG",
             "sync_interval": 120,
-            "providers": [
-                {"type": "github", "token": "test-token"}
-            ],
+            "providers": [{"type": "github", "token": "test-token"}],
         }
         config_file.write_text(json.dumps(config_data))
 

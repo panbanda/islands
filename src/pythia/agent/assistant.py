@@ -3,14 +3,13 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from typing import AsyncIterator
 
 from openai import AsyncOpenAI
 
-from pythia.config.settings import Settings, AgentConfig
+from pythia.config.settings import AgentConfig, Settings
 from pythia.indexer.service import IndexerService
 
 logger = logging.getLogger(__name__)
@@ -70,10 +69,12 @@ class PythiaAgent:
 
         if context and context.results:
             context_text = self._format_search_context(context)
-            messages.append({
-                "role": "system",
-                "content": f"Relevant code context from semantic search:\n\n{context_text}",
-            })
+            messages.append(
+                {
+                    "role": "system",
+                    "content": f"Relevant code context from semantic search:\n\n{context_text}",
+                }
+            )
 
         messages.append({"role": "user", "content": user_message})
         return messages
