@@ -1,20 +1,34 @@
 # Pythia
 
 [![CI](https://github.com/panbanda/pythia/actions/workflows/ci.yaml/badge.svg)](https://github.com/panbanda/pythia/actions/workflows/ci.yaml)
+[![Rust](https://img.shields.io/badge/rust-1.70+-orange.svg)](https://www.rust-lang.org/)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 
-**Pythia** is a codebase indexing and inquiry system that uses [LEANN](https://github.com/yichuan-w/LEANN) for semantic search with an MCP (Model Context Protocol) interface. Designed for Kubernetes environments with EFS storage, it enables AI agents to understand and answer questions about your codebases.
+**Pythia** is a codebase indexing and semantic search system built on the LEANN algorithm. It provides an MCP (Model Context Protocol) interface for AI assistants and supports multi-provider git integration.
+
+## LEANN: Low-Storage Vector Search
+
+Pythia implements the [LEANN algorithm](https://arxiv.org/abs/2506.08276) (arXiv:2506.08276) for efficient vector similarity search:
+
+> "LEANN reduces storage requirements to approximately 5% of original data size" by storing only the graph structure and recomputing embeddings on-the-fly during search.
+
+**Key features from the paper:**
+
+- **Graph-only storage**: Stores proximity graph in CSR format, not embeddings. Storage scales with edge count O(n*M), not embedding dimension O(n*d).
+- **Selective recomputation**: Embeddings computed on-demand only for nodes in the search path.
+- **High-degree preserving pruning**: Hub nodes (top 2% by degree) retain more connections to maintain graph navigability.
+- **Parameters**: M=30 connections per node, efConstruction=128 (from Section 5 of paper).
+
+For typical embedding dimensions (d=768-4096) with M=30, this yields ~25x storage reduction.
 
 ## Features
 
-- **Semantic Code Search**: Uses LEANN's graph-based vector indexing for 97% storage savings compared to traditional vector databases
-- **Multi-Provider Support**: Works with GitHub, GitLab, Bitbucket, and Gitea
+- **LEANN Core** (Rust): High-performance vector indexing with ~95% storage savings
+- **Multi-Provider Support**: GitHub, GitLab, Bitbucket, and Gitea integration
 - **MCP Interface**: Integrates with Claude Code and other MCP-compatible AI assistants
-- **OpenAI Agent**: Interactive Q&A agent using OpenAI's SDK
-- **Kubernetes Native**: Designed for EFS storage with automatic sync and webhook support
-- **Extensible Architecture**: Easy to add new git providers and indexing backends
+- **OpenAI Agent**: Interactive Q&A using OpenAI's SDK
+- **Kubernetes Native**: Designed for EFS storage with automatic sync and webhooks
 
 ## Quick Start
 
@@ -140,27 +154,48 @@ claude mcp add pythia-server -- pythia-mcp
 
 ## Architecture
 
+Pythia uses a hybrid Rust/Python architecture:
+
 ```
 pythia/
-├── providers/       # Git provider implementations
-│   ├── base.py      # Abstract base class
-│   ├── github.py    # GitHub provider
-│   ├── gitlab.py    # GitLab provider
-│   ├── bitbucket.py # Bitbucket provider
-│   └── gitea.py     # Gitea provider
-├── indexer/         # Repository indexing
-│   ├── repository.py # Repository management
-│   └── service.py    # Indexer service
-├── mcp/             # MCP server
-│   └── server.py    # MCP tool handlers
-├── agent/           # OpenAI agent
-│   └── assistant.py # Q&A assistant
-├── storage/         # EFS storage
-│   ├── efs.py       # Metadata management
-│   └── watcher.py   # File change detection
-└── config/          # Configuration
-    └── settings.py  # Pydantic settings
+├── crates/                    # Rust core libraries
+│   ├── pythia-core/           # LEANN implementation (arXiv:2506.08276)
+│   │   ├── src/
+│   │   │   ├── leann.rs       # LeannIndex, CsrGraph, EmbeddingProvider
+│   │   │   ├── hnsw.rs        # Traditional HNSW (for comparison)
+│   │   │   ├── pq.rs          # Product Quantization
+│   │   │   ├── distance.rs    # Distance metrics (cosine, euclidean, dot)
+│   │   │   └── search.rs      # Search algorithms
+│   ├── pythia-indexer/        # Repository indexing
+│   ├── pythia-providers/      # Git provider implementations
+│   ├── pythia-mcp/            # MCP server
+│   ├── pythia-agent/          # AI agent integration
+│   └── pythia-cli/            # Command-line interface
+│
+├── src/pythia/                # Python package (uses Rust via PyO3)
+│   ├── providers/             # Git provider implementations
+│   │   ├── github.py          # GitHub provider
+│   │   ├── gitlab.py          # GitLab provider
+│   │   ├── bitbucket.py       # Bitbucket provider
+│   │   └── gitea.py           # Gitea provider
+│   ├── indexer/               # Repository indexing
+│   ├── mcp/                   # MCP server
+│   ├── agent/                 # OpenAI agent
+│   └── storage/               # EFS storage
+│
+├── k8s/                       # Kubernetes manifests
+└── docker/                    # Docker configuration
 ```
+
+### Core Components
+
+| Component | Language | Description |
+|-----------|----------|-------------|
+| `pythia-core` | Rust | LEANN vector indexing, HNSW, PQ, distance metrics |
+| `pythia-indexer` | Rust | Code chunking, embedding generation |
+| `pythia-mcp` | Rust | MCP server for AI assistant integration |
+| `pythia-cli` | Rust | Command-line interface |
+| `src/pythia` | Python | High-level API, git providers, agent |
 
 ## Development
 
@@ -171,11 +206,12 @@ pythia/
 git clone https://github.com/panbanda/pythia.git
 cd pythia
 
-# Create virtual environment
+# Rust setup (required for pythia-core)
+rustup update stable
+
+# Python setup
 python -m venv .venv
 source .venv/bin/activate
-
-# Install development dependencies
 pip install -e ".[dev]"
 
 # Install pre-commit hooks
@@ -185,27 +221,35 @@ pre-commit install
 ### Running Tests
 
 ```bash
-# Run all tests
+# Rust tests (pythia-core)
+cargo test -p pythia-core
+
+# Python tests
 pytest
 
-# Run with coverage
+# With coverage
 pytest --cov=pythia --cov-report=html
-
-# Run specific tests
-pytest tests/test_providers.py -v
+cargo llvm-cov --html
 ```
 
 ### Code Quality
 
 ```bash
-# Run linter
+# Rust
+cargo fmt --check
+cargo clippy
+
+# Python
 ruff check src tests
-
-# Run formatter
 ruff format src tests
-
-# Run type checker
 mypy src
+```
+
+### Benchmarks
+
+```bash
+# Run Rust benchmarks
+cargo bench -p pythia-core
 ```
 
 ## Kubernetes Deployment
@@ -260,7 +304,8 @@ Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md)
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## Acknowledgments
+## References
 
-- [LEANN](https://github.com/yichuan-w/LEANN) - The lightweight vector database powering semantic search
-- [MCP](https://modelcontextprotocol.io/) - Model Context Protocol specification
+- **LEANN Paper**: Wang et al., "LEANN: A Low-Storage Embedding-based Retrieval System for Large Scale Generative AI Applications" ([arXiv:2506.08276](https://arxiv.org/abs/2506.08276))
+- **LEANN Implementation**: [github.com/yichuan-w/LEANN](https://github.com/yichuan-w/LEANN)
+- **MCP Specification**: [modelcontextprotocol.io](https://modelcontextprotocol.io/)

@@ -1,0 +1,49 @@
+[package]
+name = "pythia-cli"
+description = "Command-line interface for Pythia codebase indexing system"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[[bin]]
+name = "pythia"
+path = "src/main.rs"
+
+[features]
+default = ["mcp", "agent"]
+mcp = ["pythia-mcp"]
+agent = ["pythia-agent"]
+
+[dependencies]
+pythia-core.workspace = true
+pythia-indexer.workspace = true
+pythia-providers.workspace = true
+pythia-mcp = { workspace = true, optional = true }
+pythia-agent = { workspace = true, optional = true }
+
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+tokio = { workspace = true }
+clap = { workspace = true }
+config = { workspace = true }
+dotenvy = { workspace = true }
+
+# Pretty terminal output
+console = "0.15"
+indicatif = "0.17"
+tabled = "0.17"
+
+[dev-dependencies]
+assert_cmd = "2.0"
+predicates = "3.1"
+
+[lints]
+workspace = true

@@ -1,0 +1,47 @@
+[package]
+name = "pythia-indexer"
+description = "Repository indexing service with LEANN integration for Pythia"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+keywords = ["indexer", "git", "leann", "semantic-search"]
+categories = ["development-tools"]
+
+[features]
+default = []
+watch = ["notify"]
+embeddings = ["pythia-core/embeddings"]
+
+[dependencies]
+pythia-core = { workspace = true }
+pythia-providers = { workspace = true }
+
+thiserror = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+tokio = { workspace = true }
+futures = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+
+# Git operations (pure Rust)
+git2 = { workspace = true }
+
+# File watching (optional)
+notify = { workspace = true, optional = true }
+
+# Directory walking
+walkdir = { workspace = true }
+ignore = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+tokio = { workspace = true, features = ["test-util", "macros"] }
+pretty_assertions = { workspace = true }
+
+[lints]
+workspace = true

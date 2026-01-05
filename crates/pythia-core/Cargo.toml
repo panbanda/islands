@@ -1,0 +1,75 @@
+[package]
+name = "pythia-core"
+description = "Core LEANN implementation for Pythia - graph-based vector indexing with selective recomputation"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+keywords = ["leann", "hnsw", "vector-search", "approximate-nearest-neighbor", "product-quantization"]
+categories = ["algorithms", "science", "data-structures"]
+
+[dependencies]
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+bincode = { workspace = true }
+
+# Error handling
+thiserror = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+
+# Vector operations
+ordered-float = { workspace = true }
+rand = { workspace = true }
+
+# Concurrency
+parking_lot = { workspace = true }
+
+# Date/time (for storage metadata)
+chrono = { workspace = true }
+
+# UUID
+uuid = { workspace = true }
+
+# Async runtime (for embeddings)
+tokio = { workspace = true, optional = true }
+
+# Embedding models (optional)
+embed_anything = { workspace = true, optional = true }
+
+[dev-dependencies]
+criterion = { workspace = true }
+proptest = { workspace = true }
+proptest-derive = { workspace = true }
+tempfile = { workspace = true }
+pretty_assertions = { workspace = true }
+rstest = { workspace = true }
+test-case = { workspace = true }
+assert_matches = { workspace = true }
+rand_chacha = { workspace = true }
+
+[lints]
+workspace = true
+
+[features]
+default = []
+simd = [] # Future SIMD optimizations
+embeddings = ["dep:embed_anything", "dep:tokio"] # Embedding model support via embed_anything
+metal = ["embeddings", "embed_anything/metal"] # Apple Silicon GPU acceleration
+cuda = ["embeddings", "embed_anything/cuda"] # NVIDIA GPU acceleration
+
+[[bench]]
+name = "hnsw_benchmarks"
+harness = false
+
+[[bench]]
+name = "vector_ops"
+harness = false
+
+[[bench]]
+name = "pq_compression"
+harness = false

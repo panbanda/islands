@@ -1,0 +1,143 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/pythia-core",
+    "crates/pythia-providers",
+    "crates/pythia-indexer",
+    "crates/pythia-mcp",
+    "crates/pythia-cli",
+    "crates/pythia-agent",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.92"
+license = "MIT"
+authors = ["Pythia Contributors"]
+repository = "https://github.com/panbanda/pythia"
+documentation = "https://github.com/panbanda/pythia#readme"
+keywords = ["mcp", "semantic-search", "codebase-indexing", "leann", "rag", "vector-database"]
+categories = ["command-line-utilities", "development-tools", "science"]
+
+[workspace.dependencies]
+# Internal crates
+pythia-core = { path = "crates/pythia-core" }
+pythia-providers = { path = "crates/pythia-providers" }
+pythia-indexer = { path = "crates/pythia-indexer" }
+pythia-mcp = { path = "crates/pythia-mcp" }
+pythia-cli = { path = "crates/pythia-cli" }
+pythia-agent = { path = "crates/pythia-agent" }
+
+# Async runtime
+tokio = { version = "1.43", features = ["full"] }
+futures = "0.3"
+async-trait = "0.1"
+
+# HTTP client
+reqwest = { version = "0.12", features = ["json", "rustls-tls", "stream"], default-features = false }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.9"
+
+# CLI
+clap = { version = "4.5", features = ["derive", "env"] }
+
+# Logging and tracing
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# Error handling
+thiserror = "2.0"
+anyhow = "1.0"
+
+# Cryptography for webhook verification
+hmac = "0.12"
+sha2 = "0.10"
+hex = "0.4"
+
+# Git operations (gix is pure Rust, git2 requires libgit2)
+gix = { version = "0.68", default-features = false, features = ["blocking-network-client"] }
+git2 = "0.19"
+
+# Configuration
+config = "0.15"
+dotenvy = "0.15"
+
+# Date/time
+chrono = { version = "0.4", features = ["serde"] }
+
+# Path handling
+directories = "6.0"
+camino = { version = "1.1", features = ["serde1"] }
+
+# UUID generation
+uuid = { version = "1.11", features = ["v4", "serde"] }
+
+# Base64 encoding
+base64 = "0.22"
+
+# URL parsing
+url = "2.5"
+
+# File watching
+notify = "7.0"
+
+# Async file operations
+tokio-util = { version = "0.7", features = ["io"] }
+
+# OpenAI client
+async-openai = "0.25"
+
+# Vector operations (for LEANN - zero external dependencies for core math)
+ndarray = "0.16"
+ordered-float = "4.5"
+rand = "0.8"
+rand_chacha = "0.3"
+parking_lot = "0.12"
+bincode = "1.3"
+
+# Embedding models
+embed_anything = "0.6"
+
+# Directory walking
+walkdir = "2.5"
+ignore = "0.4"
+
+# Testing
+mockall = "0.13"
+tempfile = "3.14"
+wiremock = "0.6"
+proptest = "1.5"
+proptest-derive = "0.5"
+criterion = "0.6"
+pretty_assertions = "1.4"
+rstest = "0.23"
+test-case = "3.3"
+assert_matches = "1.5"
+insta = "1.41"
+tracing-test = "0.2"
+tokio-test = "0.4"
+
+[workspace.lints.rust]
+unsafe_code = "warn"
+missing_docs = "allow"
+
+[workspace.lints.clippy]
+# Focus on correctness, warn on suspicious code, allow style preferences
+all = { level = "warn", priority = -1 }
+# Disable pedantic/nursery lints as they're too noisy for CI
+# pedantic = { level = "warn", priority = -1 }
+# nursery = { level = "warn", priority = -1 }
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[profile.bench]
+lto = "thin"
+codegen-units = 1

@@ -99,3 +99,8 @@ Thumbs.db
 *.temp
 tmp/
 temp/
+
+# Rust
+target/
+*.rs.bk
+Cargo.lock
