@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pythia-config
+  namespace: pythia
+  labels:
+    app.kubernetes.io/name: pythia
+data:
+  PYTHIA_DEBUG: "false"
+  PYTHIA_LOG_LEVEL: "INFO"
+  PYTHIA_SYNC_INTERVAL: "300"
+  PYTHIA_MAX_CONCURRENT_SYNCS: "4"
+  PYTHIA_MCP_HOST: "0.0.0.0"
+  PYTHIA_MCP_PORT: "8080"
+  PYTHIA_WEBHOOK_ENABLED: "true"
+  PYTHIA_WEBHOOK_PORT: "9000"
+  PYTHIA_STORAGE__BASE_PATH: "/data/pythia"
+  PYTHIA_STORAGE__REPOS_PATH: "/data/pythia/repos"
+  PYTHIA_STORAGE__INDEXES_PATH: "/data/pythia/indexes"
+  PYTHIA_STORAGE__CACHE_PATH: "/data/pythia/cache"
+  PYTHIA_LEANN__BACKEND: "hnsw"
+  PYTHIA_LEANN__NO_RECOMPUTE: "true"
