@@ -13,6 +13,7 @@ from mcp.types import Tool, TextContent
 
 from pythia.config.settings import Settings
 from pythia.indexer.service import IndexerService
+from pythia.cli import parse_repo_url
 
 logger = logging.getLogger(__name__)
 
@@ -66,25 +67,16 @@ class PythiaMCPServer:
                 ),
                 Tool(
                     name="pythia_add_repo",
-                    description="Add a repository to be indexed. Requires provider and repository path.",
+                    description="Add a repository to be indexed by URL.",
                     inputSchema={
                         "type": "object",
                         "properties": {
-                            "provider": {
+                            "url": {
                                 "type": "string",
-                                "enum": ["github", "gitlab", "bitbucket", "gitea"],
-                                "description": "Git provider type",
-                            },
-                            "owner": {
-                                "type": "string",
-                                "description": "Repository owner or organization",
-                            },
-                            "name": {
-                                "type": "string",
-                                "description": "Repository name",
+                                "description": "Repository URL (e.g., https://github.com/owner/repo)",
                             },
                         },
-                        "required": ["provider", "owner", "name"],
+                        "required": ["url"],
                     },
                 ),
                 Tool(
@@ -187,11 +179,12 @@ class PythiaMCPServer:
 
     async def _handle_add_repo(self, arguments: dict[str, Any]) -> list[TextContent]:
         """Handle pythia_add_repo tool call."""
-        from pythia.providers.base import Repository
+        url = arguments["url"]
 
-        provider = arguments["provider"]
-        owner = arguments["owner"]
-        name = arguments["name"]
+        try:
+            provider, owner, name, base_url = parse_repo_url(url)
+        except ValueError as e:
+            return [TextContent(type="text", text=f"Invalid URL: {e}")]
 
         if provider not in self.indexer.providers:
             return [TextContent(

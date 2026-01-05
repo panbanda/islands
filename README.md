@@ -33,8 +33,12 @@ pip install -e ".[dev]"
 ### Basic Usage
 
 ```bash
-# Add a repository
-pythia add github owner repo-name --token $GITHUB_TOKEN
+# Add a repository by URL
+pythia add https://github.com/owner/repo --token $GITHUB_TOKEN
+
+# Supports various URL formats
+pythia add https://gitlab.com/owner/repo
+pythia add git@github.com:owner/repo.git
 
 # Search across indexed codebases
 pythia search "authentication middleware"
@@ -123,7 +127,7 @@ Pythia provides an MCP server for integration with Claude Code and other AI assi
 |------|-------------|
 | `pythia_list` | List all indexed codebases |
 | `pythia_search` | Semantic search across codebases |
-| `pythia_add_repo` | Add and index a repository |
+| `pythia_add_repo` | Add and index a repository by URL |
 | `pythia_sync` | Sync and re-index a repository |
 | `pythia_status` | Get index status |
 

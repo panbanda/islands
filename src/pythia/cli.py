@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import sys
+import re
 from pathlib import Path
+from urllib.parse import urlparse
 
 import click
 from rich.console import Console
@@ -15,6 +16,56 @@ from pythia.config.settings import Settings, ProviderConfig, ProviderType
 
 
 console = Console()
+
+PROVIDER_DOMAINS = {
+    "github.com": "github",
+    "gitlab.com": "gitlab",
+    "bitbucket.org": "bitbucket",
+}
+
+
+def parse_repo_url(url: str) -> tuple[str, str, str, str | None]:
+    """Parse a repository URL into (provider, owner, repo, base_url).
+
+    Supports:
+        - https://github.com/owner/repo
+        - https://github.com/owner/repo.git
+        - git@github.com:owner/repo.git
+        - https://gitlab.example.com/owner/repo (custom domains)
+    """
+    url = url.strip()
+
+    # Handle SSH URLs: git@github.com:owner/repo.git
+    ssh_match = re.match(r"git@([^:]+):([^/]+)/(.+?)(?:\.git)?$", url)
+    if ssh_match:
+        domain, owner, repo = ssh_match.groups()
+        provider = PROVIDER_DOMAINS.get(domain, "gitea")
+        base_url = None if domain in PROVIDER_DOMAINS else f"https://{domain}"
+        return provider, owner, repo, base_url
+
+    # Handle HTTPS URLs
+    parsed = urlparse(url)
+    if not parsed.netloc:
+        raise ValueError(f"Invalid repository URL: {url}")
+
+    domain = parsed.netloc.lower()
+    path = parsed.path.strip("/")
+
+    # Remove .git suffix if present
+    if path.endswith(".git"):
+        path = path[:-4]
+
+    parts = path.split("/")
+    if len(parts) < 2:
+        raise ValueError(f"Invalid repository path: {url}")
+
+    owner = parts[0]
+    repo = parts[1]
+
+    provider = PROVIDER_DOMAINS.get(domain, "gitea")
+    base_url = None if domain in PROVIDER_DOMAINS else f"https://{domain}"
+
+    return provider, owner, repo, base_url
 
 
 def setup_logging(debug: bool) -> None:
@@ -42,22 +93,34 @@ def cli(ctx: click.Context, debug: bool, config: str | None) -> None:
 
 
 @cli.command()
-@click.argument("provider", type=click.Choice(["github", "gitlab", "bitbucket", "gitea"]))
-@click.argument("owner")
-@click.argument("name")
+@click.argument("url")
 @click.option("--token", envvar="PYTHIA_GIT_TOKEN", help="Git provider token")
 @click.pass_context
-def add(ctx: click.Context, provider: str, owner: str, name: str, token: str | None) -> None:
-    """Add and index a repository."""
+def add(ctx: click.Context, url: str, token: str | None) -> None:
+    """Add and index a repository.
+
+    URL can be:
+        https://github.com/owner/repo
+        https://gitlab.com/owner/repo
+        git@github.com:owner/repo.git
+        https://gitea.example.com/owner/repo
+    """
     from pythia.indexer.service import IndexerService
     from pythia.config.settings import ProviderConfig, ProviderType
 
     settings: Settings = ctx.obj["settings"]
 
+    try:
+        provider, owner, name, base_url = parse_repo_url(url)
+    except ValueError as e:
+        console.print(f"[red]{e}[/red]")
+        return
+
     if token:
         provider_config = ProviderConfig(
             type=ProviderType(provider),
             token=token,
+            base_url=base_url,
         )
         settings.providers.append(provider_config)
 
@@ -67,6 +130,7 @@ def add(ctx: click.Context, provider: str, owner: str, name: str, token: str | N
             git_provider = indexer.providers.get(provider)
             if not git_provider:
                 console.print(f"[red]Provider '{provider}' not configured[/red]")
+                console.print(f"[dim]Set PYTHIA_GIT_TOKEN or use --token[/dim]")
                 return
 
             console.print(f"Fetching repository info for {owner}/{name}...")
