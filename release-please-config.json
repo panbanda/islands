@@ -1,8 +1,15 @@
 {
   "packages": {
     ".": {
-      "release-type": "rust",
-      "component": "islands"
+      "release-type": "simple",
+      "component": "islands",
+      "extra-files": [
+        {
+          "type": "toml",
+          "path": "Cargo.toml",
+          "jsonpath": "$.workspace.package.version"
+        }
+      ]
     },
     ".claude/skills": {
       "release-type": "simple",
