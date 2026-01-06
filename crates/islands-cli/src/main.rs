@@ -27,7 +27,7 @@ struct Cli {
 enum Commands {
     /// Add and index a repository
     Add {
-        /// Repository URL (https://github.com/owner/repo)
+        /// Repository URL (e.g. github.com/owner/repo)
         url: String,
 
         /// Git provider token

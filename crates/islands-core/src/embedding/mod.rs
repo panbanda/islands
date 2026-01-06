@@ -6,7 +6,7 @@
 //! # Features
 //!
 //! When the `embeddings` feature is enabled, this module also provides
-//! [`EmbedderProvider`] for computing embeddings using various models via
+//! `EmbedderProvider` for computing embeddings using various models via
 //! the `embed_anything` crate.
 
 use serde::{Deserialize, Serialize};
