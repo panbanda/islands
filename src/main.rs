@@ -58,9 +58,9 @@ enum Commands {
         index_name: String,
     },
 
-    /// Start the MCP server
+    /// Start the MCP server (stdio transport)
     #[cfg(feature = "mcp")]
-    Serve,
+    Mcp,
 
     /// Start interactive Q&A session
     #[cfg(all(feature = "agent", feature = "openai"))]
@@ -115,7 +115,7 @@ async fn main() -> anyhow::Result<()> {
             commands::sync_repository(&config, &index_name).await?;
         }
         #[cfg(feature = "mcp")]
-        Commands::Serve => {
+        Commands::Mcp => {
             commands::serve_mcp(&config).await?;
         }
         #[cfg(all(feature = "agent", feature = "openai"))]
