@@ -103,7 +103,6 @@ temp/
 # Rust
 target/
 *.rs.bk
-Cargo.lock
 
 # Claude Flow metrics
 .claude-flow/

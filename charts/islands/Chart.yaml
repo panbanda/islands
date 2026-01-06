@@ -9,8 +9,7 @@ home: https://github.com/panbanda/islands
 sources:
   - https://github.com/panbanda/islands
 maintainers:
-  - name: Jonathan Reyes
-    email: me@jonathanreyes.com
+  - name: panbanda
 keywords:
   - mcp
   - semantic-search

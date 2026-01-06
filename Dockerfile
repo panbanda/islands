@@ -15,7 +15,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy workspace manifests first for dependency caching
-COPY Cargo.toml Cargo.lock ./
+COPY Cargo.toml ./
 COPY crates/islands-core/Cargo.toml crates/islands-core/
 COPY crates/islands-providers/Cargo.toml crates/islands-providers/
 COPY crates/islands-indexer/Cargo.toml crates/islands-indexer/
