@@ -10,7 +10,7 @@ readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
 authors = [
-    { name = "Islands Contributors" }
+    { name = "Jonathan Reyes", email = "me@jonathanreyes.com" }
 ]
 keywords = [
     "mcp",
