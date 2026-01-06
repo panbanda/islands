@@ -1,67 +1,44 @@
 ---
 name: islands-list
-description: List all indexed codebases in Islands
+description: List indexed codebases to understand what repositories are available for semantic search
 invocation: islands list
 triggers:
-  - list indexes
-  - show indexes
-  - list codebases
-  - islands ls
+  - what repos are indexed
+  - show available codebases
+  - what can I search
 ---
 
-# Islands List Skill
+# When to Use This Skill
 
-List all codebases that have been indexed by Islands.
+Use `islands list` to:
+- Discover what codebases are available for search
+- Verify a repository was indexed successfully
+- Check index freshness before searching
+- Understand the scope of searchable code
 
-## Usage
+## Quick Reference
 
 ```bash
-# List all indexes
+# List all indexed codebases
 islands list
-
-# Short alias
-islands ls
-
-# Output as JSON
-islands list --json
 ```
 
-## Parameters
-
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| --json | Output as JSON | false |
-
 ## Output
-
-Table format showing index details:
 
 ```
 NAME         PATH                    FILES  SIZE     UPDATED
 myproject    /home/user/myproject    42     156 KB   2025-01-03 10:30
 backend      /home/user/backend      128    1.2 MB   2025-01-02 15:45
-frontend     /home/user/frontend     87     890 KB   2025-01-01 09:00
 ```
 
-## JSON Output
+## What to Check
 
-```json
-[
-  {
-    "name": "myproject",
-    "path": "/home/user/myproject",
-    "fileCount": 42,
-    "size": 159744,
-    "createdAt": "2025-01-03T10:30:00Z",
-    "updatedAt": "2025-01-03T10:30:00Z",
-    "checksum": "abc123def456"
-  }
-]
-```
+1. **Index exists**: Verify the repo you want to search is listed
+2. **File count**: Low count may indicate indexing issues
+3. **Updated date**: Stale indexes may miss recent code changes
 
-## Tips
+## Decision Making
 
-- Use `--json` for scripting and automation
-- Check index status before searching
-- Re-index with `islands index --force` to update
-- Delete old indexes manually from `~/.islands/indexes/`
+- **Index not listed**: Run `islands add <url>` first
+- **Index stale**: Run `islands sync <name>` to update
+- **Multiple indexes**: Use `-i <name>` flag in search to target specific ones

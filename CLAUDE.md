@@ -9,10 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 cargo build --release
 
 # Run all tests
-cargo test --workspace
-
-# Run tests for a specific crate
-cargo test -p islands-core
+cargo test
 
 # Run a single test
 cargo test test_name
@@ -30,28 +27,25 @@ cargo fmt
 cargo doc --no-deps
 
 # Run benchmarks
-cargo bench -p islands-core
+cargo bench
 ```
 
 ## Architecture
 
-Islands is a Rust workspace implementing LEANN (arXiv:2506.08276) for low-storage vector search. The key insight is storing only the proximity graph structure (CSR format) and recomputing embeddings on-demand during search, achieving ~95% storage reduction.
+Islands is a single Rust crate implementing LEANN (arXiv:2506.08276) for low-storage vector search. The key insight is storing only the proximity graph structure (CSR format) and recomputing embeddings on-demand during search, achieving ~95% storage reduction.
 
-### Crate Dependencies
+### Module Structure
 
 ```
-islands-cli (binary)
-    ├── islands-mcp (MCP server)
-    │   ├── islands-indexer
-    │   │   ├── islands-core (LEANN/HNSW/PQ)
-    │   │   └── islands-providers (GitHub/GitLab/Bitbucket/Gitea)
-    │   └── islands-core
-    ├── islands-agent (OpenAI integration)
-    │   └── islands-core
-    └── islands-indexer
+islands (binary + library)
+├── mcp (MCP server)
+├── agent (OpenAI integration)
+├── indexer
+│   └── providers (GitHub/GitLab/Bitbucket/Gitea)
+└── core (LEANN/HNSW/PQ)
 ```
 
-### Core Algorithms (islands-core)
+### Core Algorithms (core module)
 
 - **leann.rs**: `LeannIndex` with `CsrGraph` for graph-only storage, `EmbeddingProvider` trait for on-demand recomputation
 - **hnsw.rs**: Traditional HNSW implementation for comparison
@@ -65,7 +59,7 @@ islands-cli (binary)
 - $\text{efConstruction} = 128$
 - High-degree preserving pruning: hub nodes (top 2%) retain more connections
 
-### Provider Pattern (islands-providers)
+### Provider Pattern (providers module)
 
 All git providers implement the same async trait pattern in `base.rs`. Add new providers by implementing the trait and registering in `factory.rs`.
 

@@ -8,7 +8,7 @@ use std::time::Duration;
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use tokio::sync::{RwLock, mpsc};
 use tokio::time::sleep;
-use tracing::{debug, error, info, warn};
+use tracing::info;
 
 /// Callback type for file change events
 pub type ChangeCallback = Arc<dyn Fn(PathBuf) + Send + Sync>;
@@ -18,6 +18,7 @@ pub struct IndexWatcher {
     watch_path: PathBuf,
     debounce_secs: f64,
     watcher: Option<RecommendedWatcher>,
+    #[allow(dead_code)]
     pending: RwLock<HashMap<PathBuf, tokio::task::JoinHandle<()>>>,
     callback: Option<ChangeCallback>,
 }

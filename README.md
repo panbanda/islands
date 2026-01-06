@@ -5,7 +5,7 @@
 <img src="assets/islands-header.png" alt="Islands - Low-Storage Vector Search for Codebases" width="100%">
 
 [![CI](https://github.com/panbanda/islands/actions/workflows/rust.yaml/badge.svg)](https://github.com/panbanda/islands/actions/workflows/rust.yaml)
-[![Crates.io](https://img.shields.io/crates/v/islands-cli.svg)](https://crates.io/crates/islands-cli)
+[![Crates.io](https://img.shields.io/crates/v/islands.svg)](https://crates.io/crates/islands)
 [![Rust](https://img.shields.io/badge/rust-stable-orange.svg)](https://www.rust-lang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -95,7 +95,7 @@ Islands includes a Model Context Protocol (MCP) server that exposes semantic sea
 **Why it matters:** AI assistants work best when they can access relevant code context. MCP is the emerging standard for tool integration, and Islands provides semantic search as a first-class MCP tool. Instead of copying code into prompts, the assistant can search your indexed codebases directly.
 
 > [!TIP]
-> Configure Islands as an MCP server in Claude Code with `claude mcp add islands-server -- islands-mcp`
+> Configure Islands as an MCP server in Claude Code with `claude mcp add islands -- islands mcp`
 
 </details>
 
@@ -181,7 +181,7 @@ brew install panbanda/islands/islands
 ### Cargo
 
 ```bash
-cargo install islands-cli
+cargo install islands
 ```
 
 ### Build from Source
@@ -205,7 +205,7 @@ islands search "authentication middleware"
 islands list
 
 # Start the MCP server for AI assistant integration
-islands serve
+islands mcp
 
 # Interactive Q&A session (requires OpenAI-compatible API)
 islands ask
@@ -257,7 +257,7 @@ agent:
 ### Claude Code
 
 ```bash
-claude mcp add islands-server -- islands-mcp
+claude mcp add islands -- islands mcp
 ```
 
 ### Claude Desktop
@@ -268,7 +268,8 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 {
   "mcpServers": {
     "islands": {
-      "command": "islands-mcp"
+      "command": "islands",
+      "args": ["mcp"]
     }
   }
 }
@@ -276,16 +277,16 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
 ## Architecture
 
-Islands is a Rust workspace implementing LEANN for low-storage vector search:
+Islands is a single Rust crate implementing LEANN for low-storage vector search:
 
 ```mermaid
 flowchart TD
-    CLI[islands-cli<br/>binary]
-    MCP[islands-mcp<br/>MCP server]
-    Agent[islands-agent<br/>OpenAI-compatible]
-    Indexer[islands-indexer]
-    Core[islands-core<br/>LEANN/HNSW/PQ]
-    Providers[islands-providers<br/>GitHub/GitLab/Bitbucket/Gitea]
+    CLI[islands binary]
+    MCP[mcp module<br/>MCP server]
+    Agent[agent module<br/>OpenAI-compatible]
+    Indexer[indexer module]
+    Core[core module<br/>LEANN/HNSW/PQ]
+    Providers[providers module<br/>GitHub/GitLab/Bitbucket/Gitea]
 
     CLI --> MCP
     CLI --> Agent
@@ -297,16 +298,15 @@ flowchart TD
     Indexer --> Providers
 ```
 
-### Crates
+### Modules
 
-| Crate | Description |
-|-------|-------------|
-| `islands-core` | LEANN vector indexing, HNSW, PQ, distance metrics |
-| `islands-providers` | Git provider implementations (GitHub, GitLab, Bitbucket, Gitea) |
-| `islands-indexer` | Code chunking, embedding generation, file watching |
-| `islands-mcp` | MCP server for AI assistant integration |
-| `islands-agent` | Interactive agent for Q&A (OpenAI-compatible) |
-| `islands-cli` | Command-line interface |
+| Module | Description |
+|--------|-------------|
+| `core` | LEANN vector indexing, HNSW, PQ, distance metrics |
+| `providers` | Git provider implementations (GitHub, GitLab, Bitbucket, Gitea) |
+| `indexer` | Code chunking, embedding generation, file watching |
+| `mcp` | MCP server for AI assistant integration |
+| `agent` | Interactive agent for Q&A (OpenAI-compatible) |
 
 ### Core Algorithms
 
@@ -320,10 +320,10 @@ flowchart TD
 
 ```bash
 # Run all tests
-cargo test --workspace
+cargo test
 
-# Run tests for a specific crate
-cargo test -p islands-core
+# Run a specific test
+cargo test test_name
 
 # Format and lint
 cargo fmt
@@ -333,7 +333,7 @@ cargo clippy --all-targets -- -D warnings
 cargo doc --no-deps
 
 # Run benchmarks
-cargo bench -p islands-core
+cargo bench
 ```
 
 ## Docker

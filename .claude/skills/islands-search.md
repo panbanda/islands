@@ -1,79 +1,68 @@
 ---
 name: islands-search
-description: Search indexed codebases using Islands's semantic search capabilities
+description: Semantic search across indexed codebases to find relevant code patterns, implementations, and examples
 invocation: islands search
 triggers:
-  - search code
-  - find in codebase
-  - semantic search
-  - search indexed
+  - find code examples
+  - how is X implemented
+  - search for patterns
+  - find similar code
 ---
 
-# Islands Search Skill
+# When to Use This Skill
 
-Search across indexed codebases using natural language semantic search powered by LEANN.
+Use `islands search` when you need to:
+- Find how a concept is implemented across the codebase
+- Locate examples of a pattern (error handling, auth, API calls)
+- Answer "how does this project do X?" questions
+- Gather context before making changes to unfamiliar code
 
-## Usage
+This is semantic search, not string matching. Query with concepts and intent, not exact code.
+
+## Quick Reference
 
 ```bash
-# Basic search
+# Find implementations
 islands search "authentication middleware"
 
-# Search specific index
-islands search --index myproject "error handling"
+# Narrow to specific index
+islands search -i backend "database connection pooling"
 
-# Get more results
-islands search --limit 20 "database connection"
-
-# Output as JSON for processing
-islands search --json "api endpoints"
-
-# Set similarity threshold
-islands search --threshold 0.7 "user validation"
+# More results for broader context
+islands search -k 20 "error handling patterns"
 ```
 
-## Parameters
+## Interpreting Results
 
-| Parameter | Short | Description | Default |
-|-----------|-------|-------------|---------|
-| --index | -i | Search only this index | all indexes |
-| --limit | -l | Maximum results | 10 |
-| --threshold | | Minimum similarity (0.0-1.0) | 0.5 |
-| --json | | Output as JSON | false |
-| --timeout | | Search timeout | 5m |
-
-## Examples
-
-### Find Authentication Code
-```bash
-islands search "JWT token validation and refresh"
-```
-
-### Search for Error Handling Patterns
-```bash
-islands search --index backend "error handling middleware express"
-```
-
-### Find Database Queries
-```bash
-islands search "SQL query builder with joins" --limit 15
-```
-
-## Output Format
-
-Results show file path, line number, similarity score, and preview:
+Results show: `[rank] path:line (score) preview`
 
 ```
 [1] src/auth/jwt.go:42 (0.92)
     func ValidateToken(token string) (*Claims, error) { ... }
-
-[2] src/middleware/auth.go:15 (0.87)
-    AuthMiddleware validates JWT tokens for protected routes ...
 ```
 
-## Tips
+**Scores:**
+- 0.8+ = Highly relevant, likely what you need
+- 0.6-0.8 = Related, may provide useful context
+- 0.4-0.6 = Tangentially related, check if useful
 
-- Use natural language queries for best results
-- Higher thresholds (0.7+) give more precise matches
-- Lower thresholds (0.3-0.5) find more diverse results
-- Combine with grep for exact string matching after semantic search
+## Search Strategy
+
+1. **Start broad**: `islands search "user authentication"`
+2. **If too many results**: Add specificity or use index filter
+3. **If too few results**: Broaden terms, try synonyms
+4. **For exact matches**: Use `rg` (ripgrep) after finding the right files
+
+## Key Parameters
+
+| Flag | Purpose |
+|------|---------|
+| `-i, --index` | Limit to specific codebase |
+| `-k, --top-k` | Number of results (default: 10) |
+
+## What You Can Learn
+
+- How the project structures similar functionality
+- Naming conventions and patterns in use
+- Which files are central to a feature
+- Dependencies and integrations between modules

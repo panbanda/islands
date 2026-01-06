@@ -1,6 +1,6 @@
 # Contributing to Islands
 
-Thank you for your interest in contributing to Islands! This document provides guidelines and information about contributing.
+Thank you for your interest in contributing to Islands!
 
 ## Development Setup
 
@@ -10,54 +10,39 @@ Thank you for your interest in contributing to Islands! This document provides g
    cd islands
    ```
 
-2. Create a virtual environment:
+2. Install Rust (1.85+):
    ```bash
-   python -m venv .venv
-   source .venv/bin/activate  # or `.venv\Scripts\activate` on Windows
+   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
    ```
 
-3. Install development dependencies:
+3. Build and test:
    ```bash
-   pip install -e ".[dev]"
-   ```
-
-4. Install pre-commit hooks:
-   ```bash
-   pre-commit install
+   cargo build
+   cargo test
    ```
 
 ## Code Style
 
-- We use [ruff](https://github.com/astral-sh/ruff) for linting and formatting
-- Type hints are required for all public functions
-- Docstrings follow Google style
-
-Run code quality checks:
-```bash
-ruff check src tests
-ruff format src tests
-mypy src
-```
+- Run `cargo fmt` before committing
+- Run `cargo clippy --all-targets -- -D warnings` and fix any warnings
+- Keep functions focused and under 50 lines where practical
+- Add doc comments for public APIs
 
 ## Testing
 
-- Write tests for all new functionality
-- Maintain test coverage above 80%
-- Use pytest fixtures for common setup
-
-Run tests:
-```bash
-pytest
-pytest --cov=islands --cov-report=html
-```
+- Write tests for new functionality
+- Run the full test suite before submitting:
+  ```bash
+  cargo test
+  cargo test --doc
+  ```
 
 ## Pull Request Process
 
 1. Create a feature branch from `main`
 2. Make your changes with appropriate tests
-3. Ensure all tests pass and code quality checks succeed
-4. Update documentation as needed
-5. Submit a pull request with a clear description
+3. Ensure `cargo fmt`, `cargo clippy`, and `cargo test` pass
+4. Submit a pull request with a clear description
 
 ## Commit Messages
 
