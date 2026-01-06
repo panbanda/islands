@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.2](https://github.com/panbanda/islands/compare/islands-v0.2.1...islands-v0.2.2) (2026-01-06)
+
+
+### Bug Fixes
+
+* update macOS runner from retired macos-13 to macos-14 ([a3cdc8f](https://github.com/panbanda/islands/commit/a3cdc8f6a40d840248d5f8c8786bf523967f390f))
+
 ## [0.2.1](https://github.com/panbanda/islands/compare/islands-v0.2.0...islands-v0.2.1) (2026-01-06)
 
 
