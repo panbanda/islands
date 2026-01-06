@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.4](https://github.com/panbanda/islands/compare/islands-v0.2.3...islands-v0.2.4) (2026-01-06)
+
+
+### Bug Fixes
+
+* use vendored OpenSSL for cross-compilation ([674f9cf](https://github.com/panbanda/islands/commit/674f9cf30dcb3b4457be33e7cf4309e8ebe721a8))
+
 ## [0.2.3](https://github.com/panbanda/islands/compare/islands-v0.2.2...islands-v0.2.3) (2026-01-06)
 
 
