@@ -9,7 +9,7 @@
 [![Rust](https://img.shields.io/badge/rust-stable-orange.svg)](https://www.rust-lang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**Your codebases used to be islands. Now they're an archipelago.**
+**Your codebases were isolated, scattered, unknowable islands. Welcome to the archipelago.**
 
 Islands implements the [LEANN algorithm](https://arxiv.org/abs/2506.08276) to index and search across codebases with ~95% storage reduction. Store the map, not the territory. Recompute what you need, when you need it.
 
