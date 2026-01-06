@@ -175,8 +175,7 @@ flowchart LR
 ### Homebrew (macOS/Linux)
 
 ```bash
-brew tap panbanda/islands
-brew install islands
+brew install panbanda/islands/islands
 ```
 
 ### Cargo
