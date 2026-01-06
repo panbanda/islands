@@ -10,7 +10,7 @@ on:
       - 'Dockerfile'
       - 'Cargo.toml'
       - 'Cargo.lock'
-      - 'crates/**'
+      - 'src/**'
       - '.github/workflows/docker.yaml'
   pull_request:
     branches:
@@ -19,7 +19,7 @@ on:
       - 'Dockerfile'
       - 'Cargo.toml'
       - 'Cargo.lock'
-      - 'crates/**'
+      - 'src/**'
       - '.github/workflows/docker.yaml'
   workflow_dispatch:
 
@@ -74,7 +74,8 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          platforms: linux/amd64,linux/arm64
+          # Only build amd64 for PRs (faster), multi-platform on push
+          platforms: ${{ github.event_name == 'pull_request' && 'linux/amd64' || 'linux/amd64,linux/arm64' }}
 
       - name: Generate artifact attestation
         if: github.event_name != 'pull_request'
