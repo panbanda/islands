@@ -79,11 +79,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize the embedding model
     service.init_embedder().await?;
 
-    // Add repositories
+    // Add repositories (using URL or shorthand)
     let repos = vec![
-        Repository::new("github", "tokio-rs", "tokio"),
-        Repository::new("github", "tokio-rs", "axum"),
-        Repository::new("github", "tokio-rs", "tracing"),
+        Repository::from_url("tokio-rs/tokio")?,
+        Repository::from_url("https://github.com/tokio-rs/axum")?,
+        Repository::from_url("github:tokio-rs/tracing")?,
     ];
 
     for repo in repos {

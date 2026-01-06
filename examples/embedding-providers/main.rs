@@ -108,7 +108,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // Index a sample repository
-    let repo = Repository::new("github", "rust-lang", "rust-by-example");
+    let repo = Repository::from_url("rust-lang/rust-by-example").expect("valid URL");
 
     println!("\nIndexing {}...", repo.name);
     let info = service.add_repository(repo).await?;

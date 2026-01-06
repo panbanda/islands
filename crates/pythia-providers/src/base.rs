@@ -157,6 +157,101 @@ impl Repository {
         }
     }
 
+    /// Create a repository from a URL or shorthand.
+    ///
+    /// Supported formats:
+    /// - `https://github.com/owner/repo`
+    /// - `https://github.com/owner/repo.git`
+    /// - `git@github.com:owner/repo.git`
+    /// - `github:owner/repo`
+    /// - `owner/repo` (defaults to GitHub)
+    ///
+    /// Supported providers: github, gitlab, bitbucket
+    pub fn from_url(url: &str) -> Result<Self> {
+        let url = url.trim();
+        if url.is_empty() {
+            return Err(ProviderError::ConfigurationError("empty URL".to_string()));
+        }
+
+        // Handle shorthand formats
+        if let Some(rest) = url.strip_prefix("github:") {
+            return Self::parse_owner_repo("github", rest);
+        }
+        if let Some(rest) = url.strip_prefix("gitlab:") {
+            return Self::parse_owner_repo("gitlab", rest);
+        }
+        if let Some(rest) = url.strip_prefix("bitbucket:") {
+            return Self::parse_owner_repo("bitbucket", rest);
+        }
+
+        // Handle bare owner/repo format (defaults to GitHub)
+        if !url.contains("://") && !url.starts_with("git@") && url.contains('/') {
+            return Self::parse_owner_repo("github", url);
+        }
+
+        // Handle SSH URLs: git@github.com:owner/repo.git
+        if url.starts_with("git@") {
+            return Self::parse_ssh_url(url);
+        }
+
+        // Handle HTTPS URLs
+        Self::parse_https_url(url)
+    }
+
+    fn parse_owner_repo(provider: &str, path: &str) -> Result<Self> {
+        let path = path.trim_end_matches('/').trim_end_matches(".git");
+        let parts: Vec<&str> = path.split('/').collect();
+        if parts.len() < 2 || parts[0].is_empty() || parts[1].is_empty() {
+            return Err(ProviderError::ConfigurationError(format!(
+                "invalid repository path: {path}"
+            )));
+        }
+        let owner = parts[0];
+        let name = parts[1];
+        let clone_url = match provider {
+            "github" => format!("https://github.com/{owner}/{name}.git"),
+            "gitlab" => format!("https://gitlab.com/{owner}/{name}.git"),
+            "bitbucket" => format!("https://bitbucket.org/{owner}/{name}.git"),
+            _ => format!("https://{provider}.com/{owner}/{name}.git"),
+        };
+        Ok(Self::new(provider, owner, name, &clone_url))
+    }
+
+    fn parse_ssh_url(url: &str) -> Result<Self> {
+        // git@github.com:owner/repo.git
+        let url = url.strip_prefix("git@").unwrap_or(url);
+        let (host, path) = url.split_once(':').ok_or_else(|| {
+            ProviderError::ConfigurationError(format!("invalid SSH URL: {url}"))
+        })?;
+
+        let provider = Self::host_to_provider(host)?;
+        Self::parse_owner_repo(provider, path)
+    }
+
+    fn parse_https_url(url: &str) -> Result<Self> {
+        // Extract host and path from URL
+        let url = url.strip_prefix("https://").or_else(|| url.strip_prefix("http://"))
+            .ok_or_else(|| ProviderError::ConfigurationError(format!("invalid URL scheme: {url}")))?;
+
+        let (host, path) = url.split_once('/').ok_or_else(|| {
+            ProviderError::ConfigurationError(format!("invalid URL: {url}"))
+        })?;
+
+        let provider = Self::host_to_provider(host)?;
+        Self::parse_owner_repo(provider, path)
+    }
+
+    fn host_to_provider(host: &str) -> Result<&'static str> {
+        match host {
+            "github.com" | "www.github.com" => Ok("github"),
+            "gitlab.com" | "www.gitlab.com" => Ok("gitlab"),
+            "bitbucket.org" | "www.bitbucket.org" => Ok("bitbucket"),
+            _ => Err(ProviderError::ConfigurationError(format!(
+                "unknown provider for host: {host}"
+            ))),
+        }
+    }
+
     /// Get a unique identifier for this repository.
     pub fn id(&self) -> String {
         self.full_name.clone()
@@ -839,5 +934,87 @@ mod tests {
         assert!(!event.is_push());
         assert_eq!(event.payload.len(), 2);
         assert_eq!(event.payload.get("action").unwrap(), "opened");
+    }
+
+    #[test]
+    fn test_from_url_github_https() {
+        let repo = Repository::from_url("https://github.com/tokio-rs/tokio").unwrap();
+        assert_eq!(repo.provider, "github");
+        assert_eq!(repo.owner, "tokio-rs");
+        assert_eq!(repo.name, "tokio");
+        assert_eq!(repo.clone_url, "https://github.com/tokio-rs/tokio.git");
+    }
+
+    #[test]
+    fn test_from_url_github_https_with_git_suffix() {
+        let repo = Repository::from_url("https://github.com/tokio-rs/axum.git").unwrap();
+        assert_eq!(repo.provider, "github");
+        assert_eq!(repo.owner, "tokio-rs");
+        assert_eq!(repo.name, "axum");
+    }
+
+    #[test]
+    fn test_from_url_github_ssh() {
+        let repo = Repository::from_url("git@github.com:rust-lang/rust.git").unwrap();
+        assert_eq!(repo.provider, "github");
+        assert_eq!(repo.owner, "rust-lang");
+        assert_eq!(repo.name, "rust");
+    }
+
+    #[test]
+    fn test_from_url_gitlab_https() {
+        let repo = Repository::from_url("https://gitlab.com/inkscape/inkscape").unwrap();
+        assert_eq!(repo.provider, "gitlab");
+        assert_eq!(repo.owner, "inkscape");
+        assert_eq!(repo.name, "inkscape");
+    }
+
+    #[test]
+    fn test_from_url_bitbucket_https() {
+        let repo = Repository::from_url("https://bitbucket.org/atlassian/python-bitbucket").unwrap();
+        assert_eq!(repo.provider, "bitbucket");
+        assert_eq!(repo.owner, "atlassian");
+        assert_eq!(repo.name, "python-bitbucket");
+    }
+
+    #[test]
+    fn test_from_url_with_trailing_slash() {
+        let repo = Repository::from_url("https://github.com/tokio-rs/tokio/").unwrap();
+        assert_eq!(repo.owner, "tokio-rs");
+        assert_eq!(repo.name, "tokio");
+    }
+
+    #[test]
+    fn test_from_url_invalid_no_path() {
+        let result = Repository::from_url("https://github.com/");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_from_url_invalid_only_owner() {
+        let result = Repository::from_url("https://github.com/tokio-rs");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_from_url_invalid_empty() {
+        let result = Repository::from_url("");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_from_url_shorthand_github() {
+        let repo = Repository::from_url("github:tokio-rs/tokio").unwrap();
+        assert_eq!(repo.provider, "github");
+        assert_eq!(repo.owner, "tokio-rs");
+        assert_eq!(repo.name, "tokio");
+    }
+
+    #[test]
+    fn test_from_url_shorthand_bare() {
+        let repo = Repository::from_url("tokio-rs/tokio").unwrap();
+        assert_eq!(repo.provider, "github");
+        assert_eq!(repo.owner, "tokio-rs");
+        assert_eq!(repo.name, "tokio");
     }
 }

@@ -45,11 +45,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         service.init_embedder().await?;
     }
 
-    // Define repositories to index
+    // Define repositories to index (using URL shorthand)
     let repos = vec![
-        Repository::new("github", "tokio-rs", "tokio"),
-        Repository::new("github", "tokio-rs", "axum"),
-        Repository::new("github", "tokio-rs", "tracing"),
+        Repository::from_url("tokio-rs/tokio").expect("valid URL"),
+        Repository::from_url("tokio-rs/axum").expect("valid URL"),
+        Repository::from_url("tokio-rs/tracing").expect("valid URL"),
     ];
 
     // Index each repository
