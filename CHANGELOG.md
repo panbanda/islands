@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/panbanda/islands/compare/islands-v0.2.5...islands-v0.3.0) (2026-01-06)
+
+
+### Features
+
+* upgrade reqwest to 0.13 ([3b5670d](https://github.com/panbanda/islands/commit/3b5670d4e42a6e328c6f66853ce227f4cfdef370))
+
 ## [0.2.5](https://github.com/panbanda/islands/compare/islands-v0.2.4...islands-v0.2.5) (2026-01-06)
 
 
