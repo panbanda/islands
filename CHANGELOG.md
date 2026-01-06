@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.3](https://github.com/panbanda/islands/compare/islands-v0.2.2...islands-v0.2.3) (2026-01-06)
+
+
+### Bug Fixes
+
+* install OpenSSL on macOS CI and correct rust-version ([e01e08a](https://github.com/panbanda/islands/commit/e01e08a0c5c3ae5bf5c267da96dd5c43add302ba))
+
 ## [0.2.2](https://github.com/panbanda/islands/compare/islands-v0.2.1...islands-v0.2.2) (2026-01-06)
 
 
