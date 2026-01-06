@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.2](https://github.com/panbanda/islands/compare/islands-v1.0.1...islands-v1.0.2) (2026-01-06)
+
+
+### Bug Fixes
+
+* update Rust to 1.92 and optimize Docker build caching ([c74631b](https://github.com/panbanda/islands/commit/c74631b9ac147e88c08ee064f4d48b91bf701d73))
+* update Rust to 1.92 and optimize Docker build caching ([6ca271a](https://github.com/panbanda/islands/commit/6ca271a7044470657a720ddd83fa8b2389874821))
+
 ## [1.0.1](https://github.com/panbanda/islands/compare/islands-v1.0.0...islands-v1.0.1) (2026-01-06)
 
 

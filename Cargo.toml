@@ -1,7 +1,7 @@
 [package]
 name = "islands"
 description = "LEANN-based codebase indexing with MCP server and AI-powered search"
-version = "1.0.1"
+version = "1.0.2"
 edition = "2024"
 rust-version = "1.85"
 license = "MIT"
