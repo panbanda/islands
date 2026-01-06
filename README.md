@@ -15,12 +15,12 @@ Islands implements the [LEANN algorithm](https://arxiv.org/abs/2506.08276) (arXi
 
 **Key features from the paper:**
 
-- **Graph-only storage**: Stores proximity graph in CSR format, not embeddings. Storage scales with edge count O(n*M), not embedding dimension O(n*d).
+- **Graph-only storage**: Stores proximity graph in CSR format, not embeddings. Storage scales with edge count $O(n \cdot M)$, not embedding dimension $O(n \cdot d)$.
 - **Selective recomputation**: Embeddings computed on-demand only for nodes in the search path.
 - **High-degree preserving pruning**: Hub nodes (top 2% by degree) retain more connections to maintain graph navigability.
-- **Parameters**: M=30 connections per node, efConstruction=128 (from Section 5 of paper).
+- **Parameters**: $M = 30$ connections per node, $\text{efConstruction} = 128$ (from Section 5 of paper).
 
-For typical embedding dimensions (d=768-4096) with M=30, this yields ~25x storage reduction.
+For typical embedding dimensions ($d = 768\text{--}4096$) with $M = 30$, this yields ~25x storage reduction.
 
 ## Features
 
