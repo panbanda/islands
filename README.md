@@ -13,7 +13,7 @@
 
 Islands implements the [LEANN algorithm](https://arxiv.org/abs/2506.08276) to index and search across codebases with ~95% storage reduction. Store the map, not the territory. Recompute what you need, when you need it.
 
-**Why "Islands"?** Every codebase is an island - isolated, self-contained, surrounded by the vast ocean of everything else you've forgotten. Need to find that authentication pattern from three projects ago? Good luck sailing through git histories and grep results. Islands builds bridges between your codebases without requiring you to store massive embedding vectors everywhere. The LEANN algorithm stores only the graph structure (the map of which code relates to which) and recomputes embeddings on-demand during search. Your codebases stay on their islands; Islands just knows how to navigate between them.
+**Why "Islands"?** Every codebase is an island - isolated, self-contained, surrounded by the vast ocean of everything else you've forgotten. Need to find that authentication pattern from three projects ago? Good luck sailing through git histories and grep results. Islands builds bridges between your codebases without requiring you to store massive embedding vectors everywhere. The LEANN algorithm stores only the graph structure (the map of which code relates to which) and recomputes embeddings on-demand during search. Your codebases stay on their islands; `islands` just knows how to navigate between them.
 
 </div>
 
