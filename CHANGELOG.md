@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.0.0](https://github.com/panbanda/islands/compare/islands-v0.3.0...islands-v1.0.0) (2026-01-06)
+
+
+### ⚠ BREAKING CHANGES
+
+* Removes docker-compose.yml and raw k8s/ manifests. Users must migrate to Helm-based deployment.
+
+### Features
+
+* migrate to Helm chart with CI/CD for Docker and chart publishing ([cf0b959](https://github.com/panbanda/islands/commit/cf0b959c5899dfd80a055d2dd5d0d31e0fcebb4d))
+* migrate to Helm chart with CI/CD for Docker and chart publishing ([3dfb532](https://github.com/panbanda/islands/commit/3dfb532ffa10c285086c0356ea4068c6a8d62d51))
+
+
+### Bug Fixes
+
+* CI failures for Docker build and Helm lint ([404faa2](https://github.com/panbanda/islands/commit/404faa258e33094cb4a8299dbcd4d3eadf5ce64b))
+
 ## [0.3.0](https://github.com/panbanda/islands/compare/islands-v0.2.5...islands-v0.3.0) (2026-01-06)
 
 

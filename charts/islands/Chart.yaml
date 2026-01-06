@@ -2,9 +2,9 @@ apiVersion: v2
 name: islands
 description: Codebase Indexing and Inquiry System using LEANN for low-storage vector search
 type: application
-version: 0.1.0
-appVersion: "0.3.0"
-kubeVersion: ">=1.23.0-0"
+version: 1.0.0
+appVersion: 1.0.0
+kubeVersion: '>=1.23.0-0'
 home: https://github.com/panbanda/islands
 sources:
   - https://github.com/panbanda/islands
