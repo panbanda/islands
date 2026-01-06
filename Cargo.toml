@@ -30,12 +30,12 @@ islands-cli = { path = "crates/islands-cli" }
 islands-agent = { path = "crates/islands-agent" }
 
 # Async runtime
-tokio = { version = "1.43", features = ["full"] }
+tokio = { version = "1.49", features = ["full"] }
 futures = "0.3"
 async-trait = "0.1"
 
 # HTTP client
-reqwest = { version = "0.13", features = ["json", "rustls", "stream"], default-features = false }
+reqwest = { version = "0.13", features = ["json", "query", "rustls", "stream"], default-features = false }
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
@@ -62,8 +62,8 @@ hex = "0.4"
 openssl = { version = "0.10", features = ["vendored"] }
 
 # Git operations (gix is pure Rust, git2 requires libgit2)
-gix = { version = "0.68", default-features = false, features = ["blocking-network-client"] }
-git2 = "0.19"
+gix = { version = "0.77", default-features = false, features = ["blocking-network-client"] }
+git2 = "0.20"
 
 # Configuration
 config = "0.15"
@@ -74,10 +74,10 @@ chrono = { version = "0.4", features = ["serde"] }
 
 # Path handling
 directories = "6.0"
-camino = { version = "1.1", features = ["serde1"] }
+camino = { version = "1.2", features = ["serde1"] }
 
 # UUID generation
-uuid = { version = "1.11", features = ["v4", "serde"] }
+uuid = { version = "1.19", features = ["v4", "serde"] }
 
 # Base64 encoding
 base64 = "0.22"
@@ -86,17 +86,17 @@ base64 = "0.22"
 url = "2.5"
 
 # File watching
-notify = "7.0"
+notify = "8.0"
 
 # Async file operations
 tokio-util = { version = "0.7", features = ["io"] }
 
 # OpenAI client
-async-openai = "0.25"
+async-openai = "0.32"
 
 # Vector operations (for LEANN - zero external dependencies for core math)
 ndarray = "0.16"
-ordered-float = "4.5"
+ordered-float = "5.0"
 rand = "0.8"
 rand_chacha = "0.3"
 parking_lot = "0.12"
@@ -110,17 +110,17 @@ walkdir = "2.5"
 ignore = "0.4"
 
 # Testing
-mockall = "0.13"
-tempfile = "3.14"
+mockall = "0.14"
+tempfile = "3.24"
 wiremock = "0.6"
-proptest = "1.5"
-proptest-derive = "0.5"
+proptest = "1.9"
+proptest-derive = "0.7"
 criterion = "0.6"
 pretty_assertions = "1.4"
-rstest = "0.23"
+rstest = "0.26"
 test-case = "3.3"
 assert_matches = "1.5"
-insta = "1.41"
+insta = "1.46"
 tracing-test = "0.2"
 tokio-test = "0.4"
 
