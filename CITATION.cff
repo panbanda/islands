@@ -1,0 +1,34 @@
+cff-version: 1.2.0
+message: "If you use Islands in your research, please cite it using the following metadata."
+title: "Islands: Codebase Indexing and Semantic Search using LEANN"
+type: software
+version: 0.2.0
+date-released: 2025-01-06
+license: MIT
+repository-code: https://github.com/panbanda/islands
+url: https://github.com/panbanda/islands
+authors:
+  - family-names: Reyes
+    given-names: Jonathan
+    email: me@jonathanreyes.com
+keywords:
+  - semantic-search
+  - codebase-indexing
+  - leann
+  - vector-database
+  - mcp
+  - model-context-protocol
+  - rust
+abstract: >-
+  Islands is a high-performance codebase indexing and semantic search system
+  written in Rust, built on the LEANN algorithm. It provides an MCP (Model
+  Context Protocol) interface for AI assistants and supports multi-provider
+  git integration with GitHub, GitLab, Bitbucket, and Gitea.
+references:
+  - type: article
+    authors:
+      - family-names: Wang
+        given-names: Yichuan
+    title: "LEANN: A Low-Storage Embedding-based Retrieval System for Large Scale Generative AI Applications"
+    year: 2025
+    url: https://arxiv.org/abs/2506.08276
