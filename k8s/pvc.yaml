@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: islands-data
+  namespace: islands
+  labels:
+    app.kubernetes.io/name: islands
+spec:
+  accessModes:
+    - ReadWriteMany  # Required for EFS
+  storageClassName: efs-sc  # Use your EFS StorageClass
+  resources:
+    requests:
+      storage: 100Gi
+---
+# Example EFS StorageClass (create separately if not exists)
+# apiVersion: storage.k8s.io/v1
+# kind: StorageClass
+# metadata:
+#   name: efs-sc
+# provisioner: efs.csi.aws.com
+# parameters:
+#   provisioningMode: efs-ap
+#   fileSystemId: fs-xxxxxxxxx
+#   directoryPerms: "755"
+#   uid: "1000"
+#   gid: "1000"

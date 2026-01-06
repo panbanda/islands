@@ -1,0 +1,52 @@
+[package]
+name = "islands-agent"
+description = "AI-powered Q&A agent for Islands using OpenAI SDK"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+keywords = ["ai", "openai", "agent", "qa", "rag"]
+categories = ["development-tools", "science"]
+
+[features]
+default = ["openai"]
+openai = []
+anthropic = []
+
+[dependencies]
+# Internal crates
+islands-core = { workspace = true }
+islands-indexer = { workspace = true }
+
+# Async runtime
+tokio = { workspace = true }
+futures = { workspace = true }
+async-trait = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Error handling
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+
+# HTTP client (for custom LLM implementations)
+reqwest = { workspace = true }
+
+# Streaming
+async-stream = "0.3"
+
+[dev-dependencies]
+mockall = { workspace = true }
+tempfile = { workspace = true }
+tokio = { workspace = true, features = ["test-util", "macros"] }
+pretty_assertions = { workspace = true }
+
+[lints]
+workspace = true

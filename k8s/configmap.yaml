@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: islands-config
+  namespace: islands
+  labels:
+    app.kubernetes.io/name: islands
+data:
+  ISLANDS_DEBUG: "false"
+  ISLANDS_LOG_LEVEL: "INFO"
+  ISLANDS_SYNC_INTERVAL: "300"
+  ISLANDS_MAX_CONCURRENT_SYNCS: "4"
+  ISLANDS_MCP_HOST: "0.0.0.0"
+  ISLANDS_MCP_PORT: "8080"
+  ISLANDS_WEBHOOK_ENABLED: "true"
+  ISLANDS_WEBHOOK_PORT: "9000"
+  ISLANDS_STORAGE__BASE_PATH: "/data/islands"
+  ISLANDS_STORAGE__REPOS_PATH: "/data/islands/repos"
+  ISLANDS_STORAGE__INDEXES_PATH: "/data/islands/indexes"
+  ISLANDS_STORAGE__CACHE_PATH: "/data/islands/cache"
+  ISLANDS_LEANN__BACKEND: "hnsw"
+  ISLANDS_LEANN__NO_RECOMPUTE: "true"
