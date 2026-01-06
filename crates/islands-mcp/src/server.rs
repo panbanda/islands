@@ -10,8 +10,8 @@ use islands_indexer::IndexerService;
 
 use crate::error::{Error, Result};
 use crate::protocol::{
-    CallToolParams, CallToolResult, ContentItem, InitializeResult, MCP_VERSION,
-    Request, Response, RpcError, ServerCapabilities, ServerInfo, ToolsCapability,
+    CallToolParams, CallToolResult, ContentItem, InitializeResult, MCP_VERSION, Request, Response,
+    RpcError, ServerCapabilities, ServerInfo, ToolsCapability,
 };
 use crate::tools::IslandsTools;
 

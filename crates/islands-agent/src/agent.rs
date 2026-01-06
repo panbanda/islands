@@ -138,7 +138,7 @@ mod tests {
     use super::*;
     use crate::llm::{LlmConfig, Message};
     use async_trait::async_trait;
-    use futures::{stream, StreamExt};
+    use futures::{StreamExt, stream};
     use std::collections::HashMap;
 
     /// Mock LLM provider for testing
