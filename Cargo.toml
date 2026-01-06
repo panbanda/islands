@@ -58,6 +58,9 @@ hmac = "0.12"
 sha2 = "0.10"
 hex = "0.4"
 
+# OpenSSL (vendored for cross-compilation)
+openssl = { version = "0.10", features = ["vendored"] }
+
 # Git operations (gix is pure Rust, git2 requires libgit2)
 gix = { version = "0.68", default-features = false, features = ["blocking-network-client"] }
 git2 = "0.19"

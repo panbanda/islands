@@ -28,8 +28,9 @@ futures = { workspace = true }
 chrono = { workspace = true }
 uuid = { workspace = true }
 
-# Git operations (pure Rust)
+# Git operations
 git2 = { workspace = true }
+openssl = { workspace = true }
 
 # File watching (optional)
 notify = { workspace = true, optional = true }
