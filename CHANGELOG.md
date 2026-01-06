@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.0.1](https://github.com/panbanda/islands/compare/islands-v1.0.0...islands-v1.0.1) (2026-01-06)
+
+
+### Bug Fixes
+
+* replace let chains with nested if-let for Rust 1.85 compat ([b34f466](https://github.com/panbanda/islands/commit/b34f466f257879f6bf17691b46349cc4845abf94))
+* resolve CI errors and update docs for single-crate structure ([03a44b1](https://github.com/panbanda/islands/commit/03a44b1d7e63dd38af838260873ecaa5dc28a625))
+* update docker workflow for single-crate and faster PR builds ([4d8b4e1](https://github.com/panbanda/islands/commit/4d8b4e15db5b3c6c28cc62b615ccbc075f5c29f6))
+* update Dockerfile for single-crate structure ([8fb3ea6](https://github.com/panbanda/islands/commit/8fb3ea6f20c2b18b533ce545fece32b79d31912b))
+
 ## [1.0.0](https://github.com/panbanda/islands/compare/islands-v0.3.0...islands-v1.0.0) (2026-01-06)
 
 
