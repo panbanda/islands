@@ -5,9 +5,13 @@
 //!
 //! The server communicates via stdio using JSON-RPC 2.0.
 
-#![warn(missing_docs)]
 #![warn(clippy::all)]
-#![warn(clippy::pedantic)]
+#![allow(
+    missing_docs,
+    dead_code,
+    clippy::collapsible_if,
+    clippy::uninlined_format_args
+)]
 
 pub mod error;
 pub mod protocol;

@@ -3,9 +3,13 @@
 //! This crate provides an AI agent for answering questions about indexed
 //! codebases using LLM providers (OpenAI, Anthropic).
 
-#![warn(missing_docs)]
 #![warn(clippy::all)]
-#![warn(clippy::pedantic)]
+#![allow(
+    missing_docs,
+    unsafe_code,
+    clippy::collapsible_if,
+    clippy::uninlined_format_args
+)]
 
 pub mod agent;
 pub mod error;

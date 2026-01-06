@@ -157,10 +157,10 @@ impl<'a> Searcher<'a> {
             .map(|(id, distance)| {
                 let mut result = SearchResult::new(id, distance);
 
-                if self.config.include_vectors {
-                    if let Some(node) = self.graph.get_node(id) {
-                        result = result.with_vector(node.vector.clone());
-                    }
+                if self.config.include_vectors
+                    && let Some(node) = self.graph.get_node(id)
+                {
+                    result = result.with_vector(node.vector.clone());
                 }
 
                 result
@@ -217,10 +217,10 @@ impl MultiIndexSearcher {
             for (id, score) in results {
                 let mut result = SearchResult::new(id, score);
 
-                if self.config.include_vectors {
-                    if let Some(node) = graph.get_node(id) {
-                        result = result.with_vector(node.vector.clone());
-                    }
+                if self.config.include_vectors
+                    && let Some(node) = graph.get_node(id)
+                {
+                    result = result.with_vector(node.vector.clone());
                 }
 
                 all_results.push((name.clone(), result));

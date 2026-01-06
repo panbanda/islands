@@ -8,7 +8,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 use tokio::time::{Duration, interval};
-use tracing::{debug, error, info};
+use tracing::{error, info};
 
 use islands_providers::{GitProvider, Repository, WebhookEvent};
 
@@ -271,7 +271,10 @@ impl IndexerService {
             }
         };
 
-        info!("Embedder initialized with dimension: {}", provider.dimension());
+        info!(
+            "Embedder initialized with dimension: {}",
+            provider.dimension()
+        );
         self.embedder = Some(Arc::new(provider));
         Ok(())
     }
@@ -282,7 +285,10 @@ impl IndexerService {
             .await
             .map_err(|e| Error::IndexingFailed(format!("Failed to load preset {preset}: {e}")))?;
 
-        info!("Embedder initialized with dimension: {}", provider.dimension());
+        info!(
+            "Embedder initialized with dimension: {}",
+            provider.dimension()
+        );
         self.embedder = Some(Arc::new(provider));
         Ok(())
     }
@@ -923,7 +929,10 @@ mod tests {
 
         let service = IndexerService::new(config, HashMap::new());
         let index_names = vec!["repo1".to_string(), "repo2".to_string()];
-        let results = service.search("test query", Some(&index_names), 10).await.unwrap();
+        let results = service
+            .search("test query", Some(&index_names), 10)
+            .await
+            .unwrap();
 
         // No indexes exist, so should be empty
         assert!(results.is_empty());

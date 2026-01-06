@@ -24,7 +24,7 @@ pub enum ProviderType {
 
 impl ProviderType {
     /// Parse provider type from a string.
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn parse(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
             "github" | "github.com" => Some(Self::GitHub),
             "gitlab" | "gitlab.com" => Some(Self::GitLab),
@@ -76,7 +76,7 @@ impl ProviderFactory {
         provider_type: &str,
         config: Option<ProviderConfig>,
     ) -> Result<Arc<dyn GitProvider>> {
-        let provider_type_enum = ProviderType::from_str(provider_type)
+        let provider_type_enum = ProviderType::parse(provider_type)
             .ok_or_else(|| ProviderError::UnsupportedProvider(provider_type.to_string()))?;
 
         let config = config.unwrap_or_else(|| self.default_config(provider_type_enum));
@@ -222,7 +222,7 @@ pub fn create_provider(
     token: Option<&str>,
     webhook_secret: Option<&str>,
 ) -> Result<Arc<dyn GitProvider>> {
-    let provider_type_enum = ProviderType::from_str(provider_type)
+    let provider_type_enum = ProviderType::parse(provider_type)
         .ok_or_else(|| ProviderError::UnsupportedProvider(provider_type.to_string()))?;
 
     let base_url = base_url
@@ -409,18 +409,18 @@ mod tests {
 
     #[test]
     fn test_provider_type_from_str() {
-        assert_eq!(ProviderType::from_str("github"), Some(ProviderType::GitHub));
+        assert_eq!(ProviderType::parse("github"), Some(ProviderType::GitHub));
         assert_eq!(
-            ProviderType::from_str("github.com"),
+            ProviderType::parse("github.com"),
             Some(ProviderType::GitHub)
         );
-        assert_eq!(ProviderType::from_str("gitlab"), Some(ProviderType::GitLab));
+        assert_eq!(ProviderType::parse("gitlab"), Some(ProviderType::GitLab));
         assert_eq!(
-            ProviderType::from_str("bitbucket"),
+            ProviderType::parse("bitbucket"),
             Some(ProviderType::Bitbucket)
         );
-        assert_eq!(ProviderType::from_str("gitea"), Some(ProviderType::Gitea));
-        assert_eq!(ProviderType::from_str("unknown"), None);
+        assert_eq!(ProviderType::parse("gitea"), Some(ProviderType::Gitea));
+        assert_eq!(ProviderType::parse("unknown"), None);
     }
 
     #[test]

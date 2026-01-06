@@ -2,8 +2,6 @@
 
 use std::sync::Arc;
 
-use futures::StreamExt;
-
 use islands_indexer::IndexerService;
 
 use crate::error::Result;
@@ -47,7 +45,7 @@ impl IslandsAgent {
         self.indexer
             .search(query, None, top_k)
             .await
-            .map_err(|e| crate::error::Error::Indexer(e))
+            .map_err(crate::error::Error::Indexer)
     }
 
     /// Ask a question and get a response
@@ -140,7 +138,7 @@ mod tests {
     use super::*;
     use crate::llm::{LlmConfig, Message};
     use async_trait::async_trait;
-    use futures::stream;
+    use futures::{stream, StreamExt};
     use std::collections::HashMap;
 
     /// Mock LLM provider for testing

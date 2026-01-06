@@ -77,7 +77,7 @@ impl Config {
         {
             serde_yaml::from_str(&content).map_err(|e| crate::Error::Config(e.to_string()))
         } else {
-            serde_json::from_str(&content).map_err(|e| crate::Error::Json(e))
+            serde_json::from_str(&content).map_err(crate::Error::Json)
         }
     }
 }

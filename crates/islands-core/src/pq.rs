@@ -609,7 +609,7 @@ mod tests {
     #[test]
     fn test_encode_not_trained() {
         let pq = ProductQuantizer::new(32, PQConfig::default()).unwrap();
-        let result = pq.encode(&vec![1.0; 32]);
+        let result = pq.encode(&[1.0; 32]);
         assert!(matches!(result, Err(CoreError::PQError(_))));
     }
 

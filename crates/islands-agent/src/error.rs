@@ -50,13 +50,19 @@ mod tests {
     #[test]
     fn test_error_rate_limited() {
         let err = Error::RateLimited(60);
-        assert_eq!(err.to_string(), "rate limit exceeded, retry after 60 seconds");
+        assert_eq!(
+            err.to_string(),
+            "rate limit exceeded, retry after 60 seconds"
+        );
     }
 
     #[test]
     fn test_error_rate_limited_zero() {
         let err = Error::RateLimited(0);
-        assert_eq!(err.to_string(), "rate limit exceeded, retry after 0 seconds");
+        assert_eq!(
+            err.to_string(),
+            "rate limit exceeded, retry after 0 seconds"
+        );
     }
 
     #[test]

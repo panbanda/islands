@@ -7,101 +7,157 @@ on:
 
 permissions:
   contents: write
-  packages: write
 
 jobs:
-  release:
-    name: Release
-    runs-on: ubuntu-latest
+  build:
+    name: Build (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+          - target: x86_64-apple-darwin
+            os: macos-latest
+          - target: aarch64-apple-darwin
+            os: macos-latest
+
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
         with:
-          python-version: "3.12"
+          targets: ${{ matrix.target }}
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v4
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-${{ matrix.target }}-cargo-release-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.target }}-cargo-release-
 
-      - name: Build package
+      - name: Build release binary
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Package binary (Unix)
         run: |
-          uv venv
-          source .venv/bin/activate
-          uv pip install build
-          python -m build
+          cd target/${{ matrix.target }}/release
+          tar -czvf ../../../islands-${{ matrix.target }}.tar.gz islands
+        if: runner.os != 'Windows'
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: islands-${{ matrix.target }}
+          path: islands-${{ matrix.target }}.tar.gz
+
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          files: dist/*
+          files: artifacts/**/*.tar.gz
           generate_release_notes: true
 
-  docker:
-    name: Publish Docker Image
+  publish-crates:
+    name: Publish to crates.io
     runs-on: ubuntu-latest
     needs: release
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
 
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
+      - name: Publish crates
+        uses: katyo/publish-crates@v2
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          registry-token: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+          ignore-unpublished-changes: true
 
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ghcr.io/${{ github.repository }}
-          tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=sha
-
-      - name: Build and push
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./docker/Dockerfile
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-  pypi:
-    name: Publish to PyPI
+  update-homebrew:
+    name: Update Homebrew Tap
     runs-on: ubuntu-latest
     needs: release
-    environment: pypi
     steps:
-      - uses: actions/checkout@v4
+      - name: Extract version
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Checkout homebrew-islands
+        uses: actions/checkout@v4
         with:
-          python-version: "3.12"
+          repository: panbanda/homebrew-islands
+          token: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+          path: homebrew-islands
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v4
+      - name: Download release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
 
-      - name: Build package
+      - name: Calculate SHA256 checksums
+        id: sha
         run: |
-          uv venv
-          source .venv/bin/activate
-          uv pip install build twine
-          python -m build
+          echo "SHA_LINUX=$(sha256sum artifacts/islands-x86_64-unknown-linux-gnu/islands-x86_64-unknown-linux-gnu.tar.gz | cut -d' ' -f1)" >> $GITHUB_OUTPUT
+          echo "SHA_DARWIN=$(sha256sum artifacts/islands-x86_64-apple-darwin/islands-x86_64-apple-darwin.tar.gz | cut -d' ' -f1)" >> $GITHUB_OUTPUT
+          echo "SHA_DARWIN_ARM=$(sha256sum artifacts/islands-aarch64-apple-darwin/islands-aarch64-apple-darwin.tar.gz | cut -d' ' -f1)" >> $GITHUB_OUTPUT
 
-      - name: Publish to PyPI
-        env:
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
+      - name: Update formula
         run: |
-          source .venv/bin/activate
-          twine upload dist/*
+          cat > homebrew-islands/Formula/islands.rb << 'EOF'
+          class Islands < Formula
+            desc "Codebase indexing and inquiry system using LEANN for semantic search"
+            homepage "https://github.com/panbanda/islands"
+            version "${{ steps.version.outputs.VERSION }}"
+            license "MIT"
+
+            on_macos do
+              if Hardware::CPU.arm?
+                url "https://github.com/panbanda/islands/releases/download/v${{ steps.version.outputs.VERSION }}/islands-aarch64-apple-darwin.tar.gz"
+                sha256 "${{ steps.sha.outputs.SHA_DARWIN_ARM }}"
+              else
+                url "https://github.com/panbanda/islands/releases/download/v${{ steps.version.outputs.VERSION }}/islands-x86_64-apple-darwin.tar.gz"
+                sha256 "${{ steps.sha.outputs.SHA_DARWIN }}"
+              end
+            end
+
+            on_linux do
+              url "https://github.com/panbanda/islands/releases/download/v${{ steps.version.outputs.VERSION }}/islands-x86_64-unknown-linux-gnu.tar.gz"
+              sha256 "${{ steps.sha.outputs.SHA_LINUX }}"
+            end
+
+            def install
+              bin.install "islands"
+            end
+
+            test do
+              system "#{bin}/islands", "--version"
+            end
+          end
+          EOF
+
+      - name: Commit and push
+        working-directory: homebrew-islands
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add Formula/islands.rb
+          git commit -m "Update islands to v${{ steps.version.outputs.VERSION }}"
+          git push

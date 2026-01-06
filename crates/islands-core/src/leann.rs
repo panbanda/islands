@@ -91,9 +91,7 @@ pub trait EmbeddingProvider: Send + Sync {
     /// nodes until reaching batch size (e.g., 64) before GPU inference provides
     /// significant throughput improvements.
     fn compute_embeddings_batch(&self, ids: &[u64]) -> CoreResult<Vec<Vec<f32>>> {
-        ids.iter()
-            .map(|&id| self.compute_embedding(id))
-            .collect()
+        ids.iter().map(|&id| self.compute_embedding(id)).collect()
     }
 
     /// Get the embedding dimension.
@@ -152,9 +150,7 @@ impl EmbeddingProvider for InMemoryEmbeddingProvider {
     }
 
     fn compute_embeddings_batch(&self, ids: &[u64]) -> CoreResult<Vec<Vec<f32>>> {
-        ids.iter()
-            .map(|&id| self.compute_embedding(id))
-            .collect()
+        ids.iter().map(|&id| self.compute_embedding(id)).collect()
     }
 
     fn dimension(&self) -> usize {
@@ -273,7 +269,8 @@ impl CsrGraph {
             self.neighbors[old_start..old_end].copy_from_slice(&new_neighbors);
         } else {
             // Different size: need to rebuild (expensive but rare)
-            let mut new_neighbor_list = Vec::with_capacity(self.neighbors.len() + new_len - old_len);
+            let mut new_neighbor_list =
+                Vec::with_capacity(self.neighbors.len() + new_len - old_len);
             let mut new_offsets = Vec::with_capacity(self.node_offsets.len());
             new_offsets.push(0);
 
@@ -560,7 +557,11 @@ impl LeannIndex {
     ///
     /// This is the main build method. Embeddings are fetched from the provider
     /// during construction, but NOT stored - only the graph structure is kept.
-    pub fn build<P: EmbeddingProvider>(&mut self, provider: &P, num_vectors: usize) -> CoreResult<()> {
+    pub fn build<P: EmbeddingProvider>(
+        &mut self,
+        provider: &P,
+        num_vectors: usize,
+    ) -> CoreResult<()> {
         if num_vectors == 0 {
             return Ok(());
         }
@@ -595,7 +596,12 @@ impl LeannIndex {
                     adjacency[nid].push(id as u64);
                     // Prune if too many neighbors
                     if adjacency[nid].len() > self.config.m0 {
-                        adjacency[nid] = self.prune_neighbors_temp(&temp_embeddings, nid, &adjacency[nid], self.config.m0);
+                        adjacency[nid] = self.prune_neighbors_temp(
+                            &temp_embeddings,
+                            nid,
+                            &adjacency[nid],
+                            self.config.m0,
+                        );
                     }
                 }
             }
@@ -625,16 +631,30 @@ impl LeannIndex {
     }
 
     /// Prune neighbors using temporary embeddings
-    fn prune_neighbors_temp(&self, embeddings: &[Vec<f32>], node_id: usize, neighbors: &[u64], max_conn: usize) -> Vec<u64> {
+    fn prune_neighbors_temp(
+        &self,
+        embeddings: &[Vec<f32>],
+        node_id: usize,
+        neighbors: &[u64],
+        max_conn: usize,
+    ) -> Vec<u64> {
         let node_vec = &embeddings[node_id];
         let mut scored: Vec<(u64, f32)> = neighbors
             .iter()
             .filter_map(|&id| {
-                self.config.metric.calculate(node_vec, &embeddings[id as usize]).ok().map(|d| (id, d))
+                self.config
+                    .metric
+                    .calculate(node_vec, &embeddings[id as usize])
+                    .ok()
+                    .map(|d| (id, d))
             })
             .collect();
         scored.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
-        scored.into_iter().take(max_conn).map(|(id, _)| id).collect()
+        scored
+            .into_iter()
+            .take(max_conn)
+            .map(|(id, _)| id)
+            .collect()
     }
 
     /// Find neighbors for a new node during insertion using temp adjacency
@@ -659,7 +679,8 @@ impl LeannIndex {
 
         // Apply high-degree preserving pruning
         if self.config.high_degree_pruning && !adjacency.is_empty() {
-            candidates = self.prune_with_degree_preservation_temp(&candidates, adjacency, self.config.m0);
+            candidates =
+                self.prune_with_degree_preservation_temp(&candidates, adjacency, self.config.m0);
         } else {
             candidates.truncate(self.config.m0);
         }
@@ -680,7 +701,10 @@ impl LeannIndex {
         let mut candidates: BinaryHeap<Reverse<(OrderedFloat<f32>, u64)>> = BinaryHeap::new();
         let mut results: BinaryHeap<(OrderedFloat<f32>, u64)> = BinaryHeap::new();
 
-        let entry_dist = self.config.metric.calculate(query, &embeddings[entry as usize])?;
+        let entry_dist = self
+            .config
+            .metric
+            .calculate(query, &embeddings[entry as usize])?;
         visited.insert(entry);
         candidates.push(Reverse((OrderedFloat(entry_dist), entry)));
         results.push((OrderedFloat(entry_dist), entry));
@@ -695,8 +719,10 @@ impl LeannIndex {
             let neighbors = &adjacency[id as usize];
             for &neighbor in neighbors {
                 if visited.insert(neighbor) {
-                    let neighbor_dist =
-                        self.config.metric.calculate(query, &embeddings[neighbor as usize])?;
+                    let neighbor_dist = self
+                        .config
+                        .metric
+                        .calculate(query, &embeddings[neighbor as usize])?;
 
                     let should_add = results.len() < ef
                         || results
@@ -972,8 +998,8 @@ impl LeannIndex {
             return candidates.to_vec();
         }
 
-        let num_to_keep = ((candidates.len() as f32) * (1.0 - self.config.prune_ratio))
-            .ceil() as usize;
+        let num_to_keep =
+            ((candidates.len() as f32) * (1.0 - self.config.prune_ratio)).ceil() as usize;
         let num_to_keep = num_to_keep.max(1);
 
         match self.config.pruning_strategy {
@@ -992,7 +1018,13 @@ impl LeannIndex {
                 // Proportional: based on neighbor count
                 let total_count: usize = candidates
                     .iter()
-                    .map(|&id| self.graph.degree_counts.get(id as usize).copied().unwrap_or(0))
+                    .map(|&id| {
+                        self.graph
+                            .degree_counts
+                            .get(id as usize)
+                            .copied()
+                            .unwrap_or(0)
+                    })
                     .sum();
 
                 if total_count == 0 {
@@ -1001,7 +1033,12 @@ impl LeannIndex {
 
                 let mut selected = Vec::with_capacity(num_to_keep);
                 for &id in candidates {
-                    let degree = self.graph.degree_counts.get(id as usize).copied().unwrap_or(1);
+                    let degree = self
+                        .graph
+                        .degree_counts
+                        .get(id as usize)
+                        .copied()
+                        .unwrap_or(1);
                     let prob = degree as f32 / total_count as f32;
                     if rand::thread_rng().r#gen::<f32>() < prob * num_to_keep as f32 {
                         selected.push(id);
@@ -1033,9 +1070,9 @@ impl LeannIndex {
 mod tests {
     use super::*;
     use proptest::prelude::*;
-    use rand::rngs::StdRng;
     use rand::Rng;
     use rand::SeedableRng;
+    use rand::rngs::StdRng;
     use rstest::rstest;
 
     fn create_random_vectors(n: usize, dim: usize, seed: u64) -> Vec<Vec<f32>> {
@@ -1055,7 +1092,7 @@ mod tests {
     fn test_config_default() {
         // Default uses paper parameters: M=30, efConstruction=128
         let config = LeannConfig::default();
-        assert_eq!(config.m, 30);  // Paper: M=30
+        assert_eq!(config.m, 30); // Paper: M=30
         assert_eq!(config.m0, 60); // Paper: M0=2*M
         assert_eq!(config.ef_construction, 128); // Paper: efConstruction=128
         assert!(config.is_compact);
@@ -1339,7 +1376,7 @@ mod tests {
         // Verify serialization produces valid output
         // Note: LEANN saves storage for HIGH-dimensional embeddings (768-4096d),
         // not for low-d test vectors where graph overhead dominates
-        assert!(bytes.len() > 0, "Serialized index should not be empty");
+        assert!(!bytes.is_empty(), "Serialized index should not be empty");
 
         // Verify deserialization works
         let restored = LeannIndex::from_bytes(&bytes).unwrap();
@@ -1417,7 +1454,12 @@ mod tests {
             index.build(&provider, 50).unwrap();
 
             let results = index.search(&vectors[0], 5, &provider).unwrap();
-            assert_eq!(results.len(), 5, "Strategy {:?} should return 5 results", strategy);
+            assert_eq!(
+                results.len(),
+                5,
+                "Strategy {:?} should return 5 results",
+                strategy
+            );
         }
     }
 

@@ -1,3 +1,4 @@
+#![allow(clippy::collapsible_if)]
 //! Git provider implementations for Islands.
 //!
 //! This crate provides unified access to multiple git hosting platforms:

@@ -125,7 +125,10 @@ mod tests {
 
     #[test]
     fn test_error_from_core() {
-        let core_err = islands_core::Error::DimensionMismatch { expected: 128, actual: 64 };
+        let core_err = islands_core::Error::DimensionMismatch {
+            expected: 128,
+            actual: 64,
+        };
         let err: Error = core_err.into();
         assert!(matches!(err, Error::Core(_)));
     }

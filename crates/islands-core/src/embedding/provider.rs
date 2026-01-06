@@ -28,8 +28,8 @@
 //! # }
 //! ```
 
-use crate::error::{CoreError, CoreResult};
 use crate::Embedding;
+use crate::error::{CoreError, CoreResult};
 use embed_anything::config::TextEmbedConfig;
 use embed_anything::embeddings::embed::{EmbedData, Embedder, EmbedderBuilder};
 use serde::{Deserialize, Serialize};
@@ -416,9 +416,9 @@ impl EmbedderProvider {
                 builder = builder.api_key(Some(&key));
             }
 
-            builder
-                .from_pretrained_cloud()
-                .map_err(|e| CoreError::EmbeddingError(format!("Failed to create cloud embedder: {e}")))
+            builder.from_pretrained_cloud().map_err(|e| {
+                CoreError::EmbeddingError(format!("Failed to create cloud embedder: {e}"))
+            })
         })
         .await
         .map_err(|e| CoreError::EmbeddingError(format!("Task join error: {e}")))?

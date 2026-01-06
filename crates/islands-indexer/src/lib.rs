@@ -8,7 +8,7 @@
 
 #![warn(missing_docs)]
 #![warn(clippy::all)]
-#![warn(clippy::pedantic)]
+#![allow(clippy::uninlined_format_args)]
 
 pub mod error;
 pub mod manager;
@@ -20,13 +20,13 @@ pub mod watcher;
 
 pub use error::{Error, Result};
 pub use manager::RepositoryManager;
-pub use service::{IndexerConfig, IndexInfo, IndexerService, StoredIndex};
+pub use service::{IndexInfo, IndexerConfig, IndexerService, StoredIndex};
 pub use state::RepositoryState;
 
 /// Re-export commonly used types
 pub mod prelude {
     pub use crate::error::{Error, Result};
     pub use crate::manager::RepositoryManager;
-    pub use crate::service::{IndexerConfig, IndexInfo, IndexerService, StoredIndex};
+    pub use crate::service::{IndexInfo, IndexerConfig, IndexerService, StoredIndex};
     pub use crate::state::RepositoryState;
 }

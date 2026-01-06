@@ -125,6 +125,9 @@ mod tests {
     #[test]
     fn test_error_invalid_argument_special_chars() {
         let err = Error::InvalidArgument("--flag=value with spaces & special!".to_string());
-        assert!(err.to_string().contains("--flag=value with spaces & special!"));
+        assert!(
+            err.to_string()
+                .contains("--flag=value with spaces & special!")
+        );
     }
 }

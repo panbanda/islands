@@ -220,9 +220,9 @@ impl Repository {
     fn parse_ssh_url(url: &str) -> Result<Self> {
         // git@github.com:owner/repo.git
         let url = url.strip_prefix("git@").unwrap_or(url);
-        let (host, path) = url.split_once(':').ok_or_else(|| {
-            ProviderError::ConfigurationError(format!("invalid SSH URL: {url}"))
-        })?;
+        let (host, path) = url
+            .split_once(':')
+            .ok_or_else(|| ProviderError::ConfigurationError(format!("invalid SSH URL: {url}")))?;
 
         let provider = Self::host_to_provider(host)?;
         Self::parse_owner_repo(provider, path)
@@ -230,12 +230,16 @@ impl Repository {
 
     fn parse_https_url(url: &str) -> Result<Self> {
         // Extract host and path from URL
-        let url = url.strip_prefix("https://").or_else(|| url.strip_prefix("http://"))
-            .ok_or_else(|| ProviderError::ConfigurationError(format!("invalid URL scheme: {url}")))?;
+        let url = url
+            .strip_prefix("https://")
+            .or_else(|| url.strip_prefix("http://"))
+            .ok_or_else(|| {
+                ProviderError::ConfigurationError(format!("invalid URL scheme: {url}"))
+            })?;
 
-        let (host, path) = url.split_once('/').ok_or_else(|| {
-            ProviderError::ConfigurationError(format!("invalid URL: {url}"))
-        })?;
+        let (host, path) = url
+            .split_once('/')
+            .ok_or_else(|| ProviderError::ConfigurationError(format!("invalid URL: {url}")))?;
 
         let provider = Self::host_to_provider(host)?;
         Self::parse_owner_repo(provider, path)
@@ -971,7 +975,8 @@ mod tests {
 
     #[test]
     fn test_from_url_bitbucket_https() {
-        let repo = Repository::from_url("https://bitbucket.org/atlassian/python-bitbucket").unwrap();
+        let repo =
+            Repository::from_url("https://bitbucket.org/atlassian/python-bitbucket").unwrap();
         assert_eq!(repo.provider, "bitbucket");
         assert_eq!(repo.owner, "atlassian");
         assert_eq!(repo.name, "python-bitbucket");

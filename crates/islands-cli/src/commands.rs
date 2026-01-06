@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use islands_indexer::service::{IndexerConfig, IndexerService};
+use islands_indexer::service::IndexerService;
 use islands_providers::factory::{create_provider, parse_repo_url};
 
 use crate::Result;

@@ -3,14 +3,14 @@
 use std::sync::Arc;
 
 use serde_json::{Value, json};
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, Stdin, Stdout};
-use tracing::{debug, error, info, warn};
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use tracing::{debug, info};
 
 use islands_indexer::IndexerService;
 
 use crate::error::{Error, Result};
 use crate::protocol::{
-    CallToolParams, CallToolResult, ContentItem, InitializeParams, InitializeResult, MCP_VERSION,
+    CallToolParams, CallToolResult, ContentItem, InitializeResult, MCP_VERSION,
     Request, Response, RpcError, ServerCapabilities, ServerInfo, ToolsCapability,
 };
 use crate::tools::IslandsTools;
@@ -170,9 +170,9 @@ pub async fn run_server(indexer: Arc<IndexerService>) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::HashMap;
     use islands_indexer::service::IndexerConfig;
     use serde_json::json;
+    use std::collections::HashMap;
 
     fn create_test_server() -> McpServer {
         let config = IndexerConfig::default();
@@ -418,7 +418,10 @@ mod tests {
 
         // Verify server info (camelCase)
         let server_info = result.get("serverInfo").unwrap();
-        assert_eq!(server_info.get("name").unwrap().as_str().unwrap(), "islands");
+        assert_eq!(
+            server_info.get("name").unwrap().as_str().unwrap(),
+            "islands"
+        );
         assert!(server_info.get("version").is_some());
     }
 

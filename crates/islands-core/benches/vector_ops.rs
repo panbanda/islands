@@ -1,4 +1,5 @@
 //! Vector distance calculation benchmarks
+#![allow(clippy::explicit_auto_deref)]
 
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use islands_core::distance::{Distance, DistanceMetric};

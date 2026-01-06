@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::{Value, json};
 
 use islands_indexer::IndexerService;
@@ -614,10 +614,12 @@ mod tests {
         let tool = list.iter().find(|t| t.name == "islands_add_repo").unwrap();
         let props = &tool.input_schema["properties"];
         assert!(props["url"].is_object());
-        assert!(tool.input_schema["required"]
-            .as_array()
-            .unwrap()
-            .contains(&json!("url")));
+        assert!(
+            tool.input_schema["required"]
+                .as_array()
+                .unwrap()
+                .contains(&json!("url"))
+        );
     }
 
     #[test]
@@ -629,10 +631,12 @@ mod tests {
         let tool = list.iter().find(|t| t.name == "islands_sync").unwrap();
         let props = &tool.input_schema["properties"];
         assert!(props["index_name"].is_object());
-        assert!(tool.input_schema["required"]
-            .as_array()
-            .unwrap()
-            .contains(&json!("index_name")));
+        assert!(
+            tool.input_schema["required"]
+                .as_array()
+                .unwrap()
+                .contains(&json!("index_name"))
+        );
     }
 
     #[test]
@@ -667,8 +671,16 @@ mod tests {
         let tools = IslandsTools::new(indexer);
 
         for tool in tools.list_tools() {
-            assert!(!tool.description.is_empty(), "Tool {} has empty description", tool.name);
-            assert!(tool.description.len() > 10, "Tool {} has too short description", tool.name);
+            assert!(
+                !tool.description.is_empty(),
+                "Tool {} has empty description",
+                tool.name
+            );
+            assert!(
+                tool.description.len() > 10,
+                "Tool {} has too short description",
+                tool.name
+            );
         }
     }
 
@@ -679,9 +691,15 @@ mod tests {
 
         // Test that each tool is callable (may error but shouldn't panic)
         let _ = tools.call_tool("islands_list", json!({})).await;
-        let _ = tools.call_tool("islands_search", json!({"query": "test"})).await;
-        let _ = tools.call_tool("islands_add_repo", json!({"url": "invalid"})).await;
-        let _ = tools.call_tool("islands_sync", json!({"index_name": "test"})).await;
+        let _ = tools
+            .call_tool("islands_search", json!({"query": "test"}))
+            .await;
+        let _ = tools
+            .call_tool("islands_add_repo", json!({"url": "invalid"}))
+            .await;
+        let _ = tools
+            .call_tool("islands_sync", json!({"index_name": "test"}))
+            .await;
         let _ = tools.call_tool("islands_status", json!({})).await;
     }
 }

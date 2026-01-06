@@ -356,7 +356,10 @@ mod tests {
         let a = vec![0.0, 0.0];
         let b = vec![3.0, 4.0];
         let dist_sq = DistanceMetric::Euclidean.calculate_squared(&a, &b).unwrap();
-        assert!((dist_sq - 25.0).abs() < 1e-6, "Squared distance should be 25");
+        assert!(
+            (dist_sq - 25.0).abs() < 1e-6,
+            "Squared distance should be 25"
+        );
     }
 
     #[test]
@@ -389,7 +392,9 @@ mod tests {
     fn test_batch_calculate_empty() {
         let query = vec![1.0, 0.0];
         let vectors: Vec<&[f32]> = vec![];
-        let distances = DistanceMetric::Cosine.batch_calculate(&query, &vectors).unwrap();
+        let distances = DistanceMetric::Cosine
+            .batch_calculate(&query, &vectors)
+            .unwrap();
         assert!(distances.is_empty());
     }
 

@@ -227,12 +227,7 @@ mod tests {
 
     #[test]
     fn test_build_messages_with_context() {
-        let messages = build_messages(
-            "System",
-            &[],
-            Some("Search context here"),
-            "Question",
-        );
+        let messages = build_messages("System", &[], Some("Search context here"), "Question");
 
         assert_eq!(messages.len(), 3);
         assert_eq!(messages[0].role, "system");

@@ -4,7 +4,10 @@
 
 #![warn(missing_docs)]
 #![warn(clippy::all)]
-#![warn(clippy::pedantic)]
+#![allow(
+    clippy::uninlined_format_args,
+    clippy::field_reassign_with_default
+)]
 
 pub mod commands;
 pub mod config;

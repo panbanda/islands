@@ -1,3 +1,15 @@
+#![allow(
+    clippy::manual_is_multiple_of,
+    clippy::collapsible_if,
+    clippy::field_reassign_with_default,
+    clippy::approx_constant,
+    clippy::manual_range_contains,
+    clippy::clone_on_copy,
+    clippy::excessive_precision,
+    clippy::unnecessary_lazy_evaluations,
+    clippy::explicit_auto_deref,
+    unexpected_cfgs
+)]
 //! Islands Core - LEANN-based vector indexing and search
 //!
 //! This crate provides the core data structures and algorithms for:
@@ -50,7 +62,10 @@ pub use distance::{Distance, DistanceMetric};
 pub use embedding::Embedding;
 pub use error::{CoreError, CoreResult};
 pub use hnsw::{HnswConfig, HnswGraph, HnswNode};
-pub use leann::{CsrGraph, EmbeddingProvider, InMemoryEmbeddingProvider, LeannConfig, LeannIndex, PruningStrategy};
+pub use leann::{
+    CsrGraph, EmbeddingProvider, InMemoryEmbeddingProvider, LeannConfig, LeannIndex,
+    PruningStrategy,
+};
 pub use pq::{PQCodebook, PQConfig, ProductQuantizer};
 pub use search::{SearchConfig, SearchResult, Searcher};
 
@@ -75,7 +90,10 @@ pub mod prelude {
     pub use crate::embedding::Embedding;
     pub use crate::error::{CoreError, CoreResult};
     pub use crate::hnsw::{HnswConfig, HnswGraph};
-    pub use crate::leann::{CsrGraph, EmbeddingProvider, InMemoryEmbeddingProvider, LeannConfig, LeannIndex, PruningStrategy};
+    pub use crate::leann::{
+        CsrGraph, EmbeddingProvider, InMemoryEmbeddingProvider, LeannConfig, LeannIndex,
+        PruningStrategy,
+    };
     pub use crate::pq::ProductQuantizer;
     pub use crate::search::{SearchConfig, SearchResult, Searcher};
 }

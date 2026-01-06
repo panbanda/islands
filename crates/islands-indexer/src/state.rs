@@ -78,12 +78,7 @@ mod tests {
     use super::*;
 
     fn test_repo() -> Repository {
-        Repository::new(
-            "github",
-            "test",
-            "repo",
-            "https://github.com/test/repo.git",
-        )
+        Repository::new("github", "test", "repo", "https://github.com/test/repo.git")
     }
 
     #[test]

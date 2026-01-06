@@ -1,6 +1,6 @@
 //! Output formatting utilities
 
-use console::{Term, style};
+use console::style;
 use indicatif::{ProgressBar, ProgressStyle};
 use tabled::{Table, Tabled};
 

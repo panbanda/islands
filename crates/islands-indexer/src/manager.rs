@@ -4,9 +4,9 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use git2::{FetchOptions, RemoteCallbacks, Repository as GitRepo};
+use git2::{FetchOptions, Repository as GitRepo};
 use tokio::sync::{RwLock, Semaphore};
-use tracing::{debug, error, info, warn};
+use tracing::{error, info};
 
 use islands_providers::{GitProvider, Repository};
 
@@ -266,11 +266,7 @@ mod tests {
         let github = create_provider("github", None, None, None).unwrap();
         providers.insert("github".to_string(), github);
 
-        let manager = RepositoryManager::new(
-            PathBuf::from("/var/repos"),
-            providers,
-            8,
-        );
+        let manager = RepositoryManager::new(PathBuf::from("/var/repos"), providers, 8);
 
         assert_eq!(manager.providers.len(), 1);
         assert!(manager.providers.contains_key("github"));
@@ -465,11 +461,7 @@ mod tests {
 
     #[test]
     fn test_semaphore_permits() {
-        let manager = RepositoryManager::new(
-            PathBuf::from("/tmp"),
-            HashMap::new(),
-            3,
-        );
+        let manager = RepositoryManager::new(PathBuf::from("/tmp"), HashMap::new(), 3);
 
         // Check that semaphore has correct number of permits
         assert_eq!(manager.semaphore.available_permits(), 3);
