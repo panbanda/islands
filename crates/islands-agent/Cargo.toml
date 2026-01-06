@@ -40,7 +40,7 @@ tracing = { workspace = true }
 reqwest = { workspace = true }
 
 # Streaming
-async-stream = "0.3"
+async-stream = "0.3.6"
 
 [dev-dependencies]
 mockall = { workspace = true }

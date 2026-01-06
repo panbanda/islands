@@ -37,13 +37,13 @@ config = { workspace = true }
 dotenvy = { workspace = true }
 
 # Pretty terminal output
-console = "0.16"
-indicatif = "0.18"
+console = "0.16.2"
+indicatif = "0.18.3"
 tabled = "0.20"
 
 [dev-dependencies]
-assert_cmd = "2.1"
-predicates = "3.1"
+assert_cmd = "2.1.1"
+predicates = "3.1.3"
 
 [lints]
 workspace = true
