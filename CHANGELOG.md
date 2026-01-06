@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.5](https://github.com/panbanda/islands/compare/islands-v0.2.4...islands-v0.2.5) (2026-01-06)
+
+
+### Bug Fixes
+
+* use shasum on macOS (no sha256sum) ([a301047](https://github.com/panbanda/islands/commit/a3010470fb974a0740a93014aa992349362fef63))
+
 ## [0.2.4](https://github.com/panbanda/islands/compare/islands-v0.2.3...islands-v0.2.4) (2026-01-06)
 
 
