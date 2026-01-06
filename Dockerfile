@@ -1,12 +1,23 @@
 # Islands - Codebase Indexing and Inquiry System
-# Multi-stage build for optimized Rust binary container
+# Multi-stage build with cargo-chef for optimal caching
 
-# Build stage
-FROM rust:1.85-bookworm AS builder
-
+# Chef stage - prepare recipe
+FROM rust:1.92-bookworm AS chef
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    cargo install cargo-chef
 WORKDIR /build
 
-# Install build dependencies for git operations
+# Planner stage - analyze dependencies
+FROM chef AS planner
+COPY Cargo.toml Cargo.lock ./
+COPY src/ src/
+COPY benches/ benches/
+RUN cargo chef prepare --recipe-path recipe.json
+
+# Builder stage - build dependencies then app
+FROM chef AS builder
+
+# Install build dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     pkg-config \
     libssl-dev \
@@ -14,26 +25,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     cmake \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy manifests first for dependency caching
+# Build dependencies (cached unless Cargo.toml/lock changes)
+COPY --from=planner /build/recipe.json recipe.json
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/build/target \
+    cargo chef cook --release --recipe-path recipe.json
+
+# Build application
 COPY Cargo.toml Cargo.lock ./
-
-# Create dummy source files to build dependencies
-RUN mkdir -p src && \
-    echo "fn main() {}" > src/main.rs && \
-    echo "pub fn lib() {}" > src/lib.rs
-
-# Build dependencies only (cached layer)
-RUN cargo build --release 2>/dev/null || true
-
-# Copy actual source code
 COPY src/ src/
 COPY benches/ benches/
-
-# Touch source files to invalidate cache and rebuild with real code
-RUN touch src/main.rs src/lib.rs
-
-# Build the release binary
-RUN cargo build --release --bin islands
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/build/target \
+    cargo build --release --bin islands && \
+    cp target/release/islands /usr/local/bin/islands
 
 # Runtime stage - minimal image
 FROM debian:bookworm-slim
@@ -55,7 +60,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && useradd -m -u 1000 islands
 
 # Copy binary from builder
-COPY --from=builder /build/target/release/islands /usr/local/bin/islands
+COPY --from=builder /usr/local/bin/islands /usr/local/bin/islands
 
 # Create data directories
 RUN mkdir -p /data/islands/{repos,indexes,cache} \
@@ -69,15 +74,13 @@ ENV ISLANDS_STORAGE__CACHE_PATH=/data/islands/cache
 ENV ISLANDS_LOG_LEVEL=INFO
 ENV RUST_LOG=info
 
-# Health check using the CLI
+# Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD islands --version || exit 1
 
 USER islands
 
-# Default command runs the MCP server
 ENTRYPOINT ["islands"]
 CMD ["mcp"]
 
-# Expose MCP and webhook ports
 EXPOSE 8080 9000
