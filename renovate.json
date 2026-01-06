@@ -1,0 +1,54 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":semanticCommits",
+    ":automergeMinor",
+    "group:allNonMajor"
+  ],
+  "labels": ["dependencies"],
+  "rangeStrategy": "bump",
+  "cargo": {
+    "enabled": true
+  },
+  "packageRules": [
+    {
+      "description": "Group Rust crate updates",
+      "matchManagers": ["cargo"],
+      "groupName": "rust dependencies",
+      "automerge": true,
+      "matchUpdateTypes": ["minor", "patch"]
+    },
+    {
+      "description": "Group GitHub Actions updates",
+      "matchManagers": ["github-actions"],
+      "groupName": "github actions",
+      "automerge": true
+    },
+    {
+      "description": "Group tree-sitter crates",
+      "matchPackagePatterns": ["^tree-sitter"],
+      "groupName": "tree-sitter"
+    },
+    {
+      "description": "Group tokio ecosystem",
+      "matchPackagePatterns": ["^tokio"],
+      "groupName": "tokio"
+    },
+    {
+      "description": "Group serde ecosystem",
+      "matchPackagePatterns": ["^serde"],
+      "groupName": "serde"
+    },
+    {
+      "description": "Require manual review for major updates",
+      "matchUpdateTypes": ["major"],
+      "automerge": false,
+      "labels": ["dependencies", "major"]
+    }
+  ],
+  "schedule": ["before 6am on monday"],
+  "timezone": "America/Los_Angeles",
+  "prConcurrentLimit": 5,
+  "prHourlyLimit": 2
+}
