@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "islands.fullname" . }}
+  labels:
+    {{- include "islands.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - name: mcp
+      port: {{ .Values.service.mcpPort }}
+      targetPort: mcp
+      protocol: TCP
+    - name: webhook
+      port: {{ .Values.service.webhookPort }}
+      targetPort: webhook
+      protocol: TCP
+  selector:
+    {{- include "islands.selectorLabels" . | nindent 4 }}

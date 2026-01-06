@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "islands.configmapName" . }}
+  labels:
+    {{- include "islands.labels" . | nindent 4 }}
+data:
+  ISLANDS_DEBUG: {{ .Values.config.debug | quote }}
+  ISLANDS_LOG_LEVEL: {{ .Values.config.logLevel | quote }}
+  ISLANDS_SYNC_INTERVAL: {{ .Values.config.syncInterval | quote }}
+  ISLANDS_MAX_CONCURRENT_SYNCS: {{ .Values.config.maxConcurrentSyncs | quote }}
+  ISLANDS_MCP_HOST: {{ .Values.config.mcp.host | quote }}
+  ISLANDS_MCP_PORT: {{ .Values.config.mcp.port | quote }}
+  ISLANDS_WEBHOOK_ENABLED: {{ .Values.config.webhook.enabled | quote }}
+  ISLANDS_WEBHOOK_PORT: {{ .Values.config.webhook.port | quote }}
+  ISLANDS_STORAGE__BASE_PATH: {{ .Values.config.storage.basePath | quote }}
+  ISLANDS_STORAGE__REPOS_PATH: {{ .Values.config.storage.reposPath | quote }}
+  ISLANDS_STORAGE__INDEXES_PATH: {{ .Values.config.storage.indexesPath | quote }}
+  ISLANDS_STORAGE__CACHE_PATH: {{ .Values.config.storage.cachePath | quote }}
+  ISLANDS_LEANN__BACKEND: {{ .Values.config.leann.backend | quote }}
+  ISLANDS_LEANN__NO_RECOMPUTE: {{ .Values.config.leann.noRecompute | quote }}
+  ISLANDS_LEANN__CHUNK_SIZE: {{ .Values.config.leann.chunkSize | quote }}
+  ISLANDS_LEANN__CHUNK_OVERLAP: {{ .Values.config.leann.chunkOverlap | quote }}
+  RUST_LOG: {{ .Values.config.logLevel | lower | quote }}

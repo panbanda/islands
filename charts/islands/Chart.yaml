@@ -1,0 +1,26 @@
+apiVersion: v2
+name: islands
+description: Codebase Indexing and Inquiry System using LEANN for low-storage vector search
+type: application
+version: 0.1.0
+appVersion: "0.3.0"
+kubeVersion: ">=1.23.0-0"
+home: https://github.com/panbanda/islands
+sources:
+  - https://github.com/panbanda/islands
+maintainers:
+  - name: panbanda
+keywords:
+  - mcp
+  - semantic-search
+  - codebase-indexing
+  - leann
+  - rag
+  - vector-database
+annotations:
+  artifacthub.io/license: MIT
+  artifacthub.io/links: |
+    - name: Documentation
+      url: https://github.com/panbanda/islands#readme
+    - name: Source
+      url: https://github.com/panbanda/islands

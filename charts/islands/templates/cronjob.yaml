@@ -1,0 +1,70 @@
+{{- if .Values.cronJob.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "islands.fullname" . }}-sync
+  labels:
+    {{- include "islands.labels" . | nindent 4 }}
+    app.kubernetes.io/component: sync
+spec:
+  schedule: {{ .Values.cronJob.schedule | quote }}
+  concurrencyPolicy: {{ .Values.cronJob.concurrencyPolicy }}
+  successfulJobsHistoryLimit: {{ .Values.cronJob.successfulJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ .Values.cronJob.failedJobsHistoryLimit }}
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            {{- include "islands.selectorLabels" . | nindent 12 }}
+            app.kubernetes.io/component: sync
+        spec:
+          {{- with .Values.imagePullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          serviceAccountName: {{ include "islands.serviceAccountName" . }}
+          securityContext:
+            {{- toYaml .Values.podSecurityContext | nindent 12 }}
+          restartPolicy: OnFailure
+          containers:
+            - name: sync
+              securityContext:
+                {{- toYaml .Values.securityContext | nindent 16 }}
+              image: {{ include "islands.image" . }}
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              command:
+                - islands
+                - sync
+                - --all
+              envFrom:
+                - configMapRef:
+                    name: {{ include "islands.configmapName" . }}
+                - secretRef:
+                    name: {{ include "islands.secretName" . }}
+              volumeMounts:
+                - name: data
+                  mountPath: {{ .Values.config.storage.basePath }}
+                - name: tmp
+                  mountPath: /tmp
+              resources:
+                {{- toYaml .Values.cronJob.resources | nindent 16 }}
+          volumes:
+            - name: data
+              {{- if .Values.persistence.enabled }}
+              persistentVolumeClaim:
+                claimName: {{ include "islands.pvcName" . }}
+              {{- else }}
+              emptyDir: {}
+              {{- end }}
+            - name: tmp
+              emptyDir: {}
+          {{- with .Values.nodeSelector }}
+          nodeSelector:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.tolerations }}
+          tolerations:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+{{- end }}
