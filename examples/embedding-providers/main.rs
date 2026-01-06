@@ -4,11 +4,11 @@
 
 use std::path::PathBuf;
 
-use pythia_indexer::{IndexerConfig, IndexerService};
-use pythia_providers::Repository;
+use islands_indexer::{IndexerConfig, IndexerService};
+use islands_providers::Repository;
 
 #[cfg(feature = "embeddings")]
-use pythia_indexer::EmbeddingConfig;
+use islands_indexer::EmbeddingConfig;
 
 /// Create an indexer with local embeddings
 #[cfg(feature = "embeddings")]

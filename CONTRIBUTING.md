@@ -1,13 +1,13 @@
-# Contributing to Pythia
+# Contributing to Islands
 
-Thank you for your interest in contributing to Pythia! This document provides guidelines and information about contributing.
+Thank you for your interest in contributing to Islands! This document provides guidelines and information about contributing.
 
 ## Development Setup
 
 1. Fork and clone the repository:
    ```bash
-   git clone https://github.com/YOUR_USERNAME/pythia.git
-   cd pythia
+   git clone https://github.com/YOUR_USERNAME/islands.git
+   cd islands
    ```
 
 2. Create a virtual environment:
@@ -48,7 +48,7 @@ mypy src
 Run tests:
 ```bash
 pytest
-pytest --cov=pythia --cov-report=html
+pytest --cov=islands --cov-report=html
 ```
 
 ## Pull Request Process

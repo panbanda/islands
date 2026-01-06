@@ -1,15 +1,15 @@
-# Pythia
+# Islands
 
-[![CI](https://github.com/panbanda/pythia/actions/workflows/ci.yaml/badge.svg)](https://github.com/panbanda/pythia/actions/workflows/ci.yaml)
+[![CI](https://github.com/panbanda/islands/actions/workflows/ci.yaml/badge.svg)](https://github.com/panbanda/islands/actions/workflows/ci.yaml)
 [![Rust](https://img.shields.io/badge/rust-1.70+-orange.svg)](https://www.rust-lang.org/)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**Pythia** is a codebase indexing and semantic search system built on the LEANN algorithm. It provides an MCP (Model Context Protocol) interface for AI assistants and supports multi-provider git integration.
+**Islands** is a codebase indexing and semantic search system built on the LEANN algorithm. It provides an MCP (Model Context Protocol) interface for AI assistants and supports multi-provider git integration.
 
 ## LEANN: Low-Storage Vector Search
 
-Pythia implements the [LEANN algorithm](https://arxiv.org/abs/2506.08276) (arXiv:2506.08276) for efficient vector similarity search:
+Islands implements the [LEANN algorithm](https://arxiv.org/abs/2506.08276) (arXiv:2506.08276) for efficient vector similarity search:
 
 > "LEANN reduces storage requirements to approximately 5% of original data size" by storing only the graph structure and recomputing embeddings on-the-fly during search.
 
@@ -36,11 +36,11 @@ For typical embedding dimensions (d=768-4096) with M=30, this yields ~25x storag
 
 ```bash
 # Install with pip
-pip install pythia
+pip install islands
 
 # Or install from source
-git clone https://github.com/panbanda/pythia.git
-cd pythia
+git clone https://github.com/panbanda/islands.git
+cd islands
 pip install -e ".[dev]"
 ```
 
@@ -48,30 +48,30 @@ pip install -e ".[dev]"
 
 ```bash
 # Add a repository by URL
-pythia add https://github.com/owner/repo --token $GITHUB_TOKEN
+islands add https://github.com/owner/repo --token $GITHUB_TOKEN
 
 # Supports various URL formats
-pythia add https://gitlab.com/owner/repo
-pythia add git@github.com:owner/repo.git
+islands add https://gitlab.com/owner/repo
+islands add git@github.com:owner/repo.git
 
 # Search across indexed codebases
-pythia search "authentication middleware"
+islands search "authentication middleware"
 
 # List all indexes
-pythia list
+islands list
 
 # Start the MCP server
-pythia serve
+islands serve
 
 # Interactive Q&A session
-pythia ask
+islands ask
 ```
 
 ### Docker
 
 ```bash
 # Build the image
-docker build -t pythia -f docker/Dockerfile .
+docker build -t islands -f docker/Dockerfile .
 
 # Run with docker-compose
 docker-compose -f docker/docker-compose.yml up
@@ -89,20 +89,20 @@ kustomize build k8s/ | kubectl apply -f -
 
 ## Configuration
 
-Pythia is configured through environment variables or a config file.
+Islands is configured through environment variables or a config file.
 
 ### Environment Variables
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `PYTHIA_DEBUG` | Enable debug mode | `false` |
-| `PYTHIA_LOG_LEVEL` | Log level | `INFO` |
-| `PYTHIA_OPENAI_API_KEY` | OpenAI API key for agent | - |
-| `PYTHIA_SYNC_INTERVAL` | Sync interval in seconds | `300` |
-| `PYTHIA_MAX_CONCURRENT_SYNCS` | Max concurrent syncs | `4` |
-| `PYTHIA_STORAGE__BASE_PATH` | Base storage path | `/data/pythia` |
-| `PYTHIA_PROVIDERS__0__TYPE` | First provider type | - |
-| `PYTHIA_PROVIDERS__0__TOKEN` | First provider token | - |
+| `ISLANDS_DEBUG` | Enable debug mode | `false` |
+| `ISLANDS_LOG_LEVEL` | Log level | `INFO` |
+| `ISLANDS_OPENAI_API_KEY` | OpenAI API key for agent | - |
+| `ISLANDS_SYNC_INTERVAL` | Sync interval in seconds | `300` |
+| `ISLANDS_MAX_CONCURRENT_SYNCS` | Max concurrent syncs | `4` |
+| `ISLANDS_STORAGE__BASE_PATH` | Base storage path | `/data/islands` |
+| `ISLANDS_PROVIDERS__0__TYPE` | First provider type | - |
+| `ISLANDS_PROVIDERS__0__TOKEN` | First provider token | - |
 
 ### Config File
 
@@ -112,9 +112,9 @@ log_level: INFO
 sync_interval: 300
 
 storage:
-  base_path: /data/pythia
-  repos_path: /data/pythia/repos
-  indexes_path: /data/pythia/indexes
+  base_path: /data/islands
+  repos_path: /data/islands/repos
+  indexes_path: /data/islands/indexes
 
 leann:
   backend: hnsw
@@ -133,46 +133,46 @@ agent:
 
 ## MCP Integration
 
-Pythia provides an MCP server for integration with Claude Code and other AI assistants.
+Islands provides an MCP server for integration with Claude Code and other AI assistants.
 
 ### Available Tools
 
 | Tool | Description |
 |------|-------------|
-| `pythia_list` | List all indexed codebases |
-| `pythia_search` | Semantic search across codebases |
-| `pythia_add_repo` | Add and index a repository by URL |
-| `pythia_sync` | Sync and re-index a repository |
-| `pythia_status` | Get index status |
+| `islands_list` | List all indexed codebases |
+| `islands_search` | Semantic search across codebases |
+| `islands_add_repo` | Add and index a repository by URL |
+| `islands_sync` | Sync and re-index a repository |
+| `islands_status` | Get index status |
 
 ### Claude Code Integration
 
 ```bash
-# Add Pythia as an MCP server
-claude mcp add pythia-server -- pythia-mcp
+# Add Islands as an MCP server
+claude mcp add islands-server -- islands-mcp
 ```
 
 ## Architecture
 
-Pythia uses a hybrid Rust/Python architecture:
+Islands uses a hybrid Rust/Python architecture:
 
 ```
-pythia/
+islands/
 ├── crates/                    # Rust core libraries
-│   ├── pythia-core/           # LEANN implementation (arXiv:2506.08276)
+│   ├── islands-core/           # LEANN implementation (arXiv:2506.08276)
 │   │   ├── src/
 │   │   │   ├── leann.rs       # LeannIndex, CsrGraph, EmbeddingProvider
 │   │   │   ├── hnsw.rs        # Traditional HNSW (for comparison)
 │   │   │   ├── pq.rs          # Product Quantization
 │   │   │   ├── distance.rs    # Distance metrics (cosine, euclidean, dot)
 │   │   │   └── search.rs      # Search algorithms
-│   ├── pythia-indexer/        # Repository indexing
-│   ├── pythia-providers/      # Git provider implementations
-│   ├── pythia-mcp/            # MCP server
-│   ├── pythia-agent/          # AI agent integration
-│   └── pythia-cli/            # Command-line interface
+│   ├── islands-indexer/        # Repository indexing
+│   ├── islands-providers/      # Git provider implementations
+│   ├── islands-mcp/            # MCP server
+│   ├── islands-agent/          # AI agent integration
+│   └── islands-cli/            # Command-line interface
 │
-├── src/pythia/                # Python package (uses Rust via PyO3)
+├── src/islands/                # Python package (uses Rust via PyO3)
 │   ├── providers/             # Git provider implementations
 │   │   ├── github.py          # GitHub provider
 │   │   ├── gitlab.py          # GitLab provider
@@ -191,11 +191,11 @@ pythia/
 
 | Component | Language | Description |
 |-----------|----------|-------------|
-| `pythia-core` | Rust | LEANN vector indexing, HNSW, PQ, distance metrics |
-| `pythia-indexer` | Rust | Code chunking, embedding generation |
-| `pythia-mcp` | Rust | MCP server for AI assistant integration |
-| `pythia-cli` | Rust | Command-line interface |
-| `src/pythia` | Python | High-level API, git providers, agent |
+| `islands-core` | Rust | LEANN vector indexing, HNSW, PQ, distance metrics |
+| `islands-indexer` | Rust | Code chunking, embedding generation |
+| `islands-mcp` | Rust | MCP server for AI assistant integration |
+| `islands-cli` | Rust | Command-line interface |
+| `src/islands` | Python | High-level API, git providers, agent |
 
 ## Development
 
@@ -203,10 +203,10 @@ pythia/
 
 ```bash
 # Clone the repository
-git clone https://github.com/panbanda/pythia.git
-cd pythia
+git clone https://github.com/panbanda/islands.git
+cd islands
 
-# Rust setup (required for pythia-core)
+# Rust setup (required for islands-core)
 rustup update stable
 
 # Python setup
@@ -221,14 +221,14 @@ pre-commit install
 ### Running Tests
 
 ```bash
-# Rust tests (pythia-core)
-cargo test -p pythia-core
+# Rust tests (islands-core)
+cargo test -p islands-core
 
 # Python tests
 pytest
 
 # With coverage
-pytest --cov=pythia --cov-report=html
+pytest --cov=islands --cov-report=html
 cargo llvm-cov --html
 ```
 
@@ -249,7 +249,7 @@ mypy src
 
 ```bash
 # Run Rust benchmarks
-cargo bench -p pythia-core
+cargo bench -p islands-core
 ```
 
 ## Kubernetes Deployment
@@ -263,11 +263,11 @@ cargo bench -p pythia-core
 
 1. **Create namespace and secrets**:
    ```bash
-   kubectl create namespace pythia
-   kubectl create secret generic pythia-secrets \
-     --from-literal=PYTHIA_OPENAI_API_KEY=$OPENAI_API_KEY \
-     --from-literal=PYTHIA_PROVIDERS__0__TOKEN=$GITHUB_TOKEN \
-     -n pythia
+   kubectl create namespace islands
+   kubectl create secret generic islands-secrets \
+     --from-literal=ISLANDS_OPENAI_API_KEY=$OPENAI_API_KEY \
+     --from-literal=ISLANDS_PROVIDERS__0__TOKEN=$GITHUB_TOKEN \
+     -n islands
    ```
 
 2. **Configure EFS StorageClass**:
@@ -282,7 +282,7 @@ cargo bench -p pythia-core
      fileSystemId: fs-xxxxxxxxx
    ```
 
-3. **Deploy Pythia**:
+3. **Deploy Islands**:
    ```bash
    kubectl apply -k k8s/
    ```

@@ -49,7 +49,7 @@ repos = [
 
 ## Usage
 
-### 1. Build Pythia
+### 1. Build Islands
 
 ```bash
 cargo build --release --features embeddings
@@ -58,8 +58,8 @@ cargo build --release --features embeddings
 ### 2. Index Repositories
 
 ```rust
-use pythia_indexer::{IndexerConfig, IndexerService, EmbeddingConfig};
-use pythia_providers::{GitHubProvider, Repository};
+use islands_indexer::{IndexerConfig, IndexerService, EmbeddingConfig};
+use islands_providers::{GitHubProvider, Repository};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -99,7 +99,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ### 3. Search Across Repositories
 
 ```rust
-use pythia_indexer::IndexerService;
+use islands_indexer::IndexerService;
 
 async fn search_codebase(
     service: &IndexerService,
@@ -127,7 +127,7 @@ search_codebase(&service, "tracing span attributes and fields").await?;
 ### 4. Ask Questions with the Agent
 
 ```rust
-use pythia_agent::{Agent, AgentConfig};
+use islands_agent::{Agent, AgentConfig};
 
 async fn ask_question(
     agent: &Agent,

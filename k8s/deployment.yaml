@@ -1,29 +1,29 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: pythia
-  namespace: pythia
+  name: islands
+  namespace: islands
   labels:
-    app.kubernetes.io/name: pythia
+    app.kubernetes.io/name: islands
     app.kubernetes.io/component: server
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app.kubernetes.io/name: pythia
+      app.kubernetes.io/name: islands
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: pythia
+        app.kubernetes.io/name: islands
     spec:
-      serviceAccountName: pythia
+      serviceAccountName: islands
       securityContext:
         runAsUser: 1000
         runAsGroup: 1000
         fsGroup: 1000
       containers:
-        - name: pythia
-          image: pythia:latest
+        - name: islands
+          image: islands:latest
           imagePullPolicy: IfNotPresent
           ports:
             - name: mcp
@@ -34,14 +34,14 @@ spec:
               protocol: TCP
           envFrom:
             - configMapRef:
-                name: pythia-config
+                name: islands-config
             - secretRef:
-                name: pythia-secrets
+                name: islands-secrets
           volumeMounts:
             - name: data
-              mountPath: /data/pythia
+              mountPath: /data/islands
             - name: ssh-keys
-              mountPath: /home/pythia/.ssh
+              mountPath: /home/islands/.ssh
               readOnly: true
           resources:
             requests:
@@ -55,7 +55,7 @@ spec:
               command:
                 - python
                 - -c
-                - "import pythia"
+                - "import islands"
             initialDelaySeconds: 10
             periodSeconds: 30
             timeoutSeconds: 10
@@ -67,17 +67,17 @@ spec:
       volumes:
         - name: data
           persistentVolumeClaim:
-            claimName: pythia-data
+            claimName: islands-data
         - name: ssh-keys
           secret:
-            secretName: pythia-ssh-keys
+            secretName: islands-ssh-keys
             optional: true
             defaultMode: 0400
 ---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: pythia
-  namespace: pythia
+  name: islands
+  namespace: islands
   labels:
-    app.kubernetes.io/name: pythia
+    app.kubernetes.io/name: islands

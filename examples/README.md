@@ -1,6 +1,6 @@
-# Pythia Examples
+# Islands Examples
 
-This directory contains examples demonstrating different ways to use Pythia for semantic code search.
+This directory contains examples demonstrating different ways to use Islands for semantic code search.
 
 ## Examples
 
@@ -9,7 +9,7 @@ This directory contains examples demonstrating different ways to use Pythia for 
 | [multi-repo-search](./multi-repo-search/) | Index multiple GitHub repositories and search across them |
 | [local-indexing](./local-indexing/) | Index local directories and projects |
 | [embedding-providers](./embedding-providers/) | Configure different embedding backends (local, OpenAI, Cohere) |
-| [mcp-integration](./mcp-integration/) | Use Pythia as an MCP server for AI assistants |
+| [mcp-integration](./mcp-integration/) | Use Islands as an MCP server for AI assistants |
 
 ## Prerequisites
 
@@ -18,7 +18,7 @@ This directory contains examples demonstrating different ways to use Pythia for 
    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
    ```
 
-2. **Build Pythia with embeddings**
+2. **Build Islands with embeddings**
    ```bash
    cargo build --release --features embeddings
    ```
@@ -95,7 +95,7 @@ export GITHUB_TOKEN="ghp_..."
 
 1. **Create a repository from URL**
    ```rust
-   use pythia_providers::Repository;
+   use islands_providers::Repository;
 
    // All of these work:
    let repo = Repository::from_url("tokio-rs/tokio")?;

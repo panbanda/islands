@@ -15,8 +15,8 @@ This example shows how to:
 
 ```rust
 use std::path::PathBuf;
-use pythia_indexer::{IndexerConfig, IndexerService};
-use pythia_providers::Repository;
+use islands_indexer::{IndexerConfig, IndexerService};
+use islands_providers::Repository;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -59,7 +59,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 Enable the `watch` feature to automatically re-index on file changes:
 
 ```rust
-use pythia_indexer::watcher::FileWatcher;
+use islands_indexer::watcher::FileWatcher;
 
 // Create a watcher for the indexed directory
 let watcher = FileWatcher::new(&service)?;
@@ -91,7 +91,7 @@ batch_size = 64
 
 ## Ignoring Files
 
-Pythia respects `.gitignore` patterns. You can also create a `.pythiaignore` file:
+Islands respects `.gitignore` patterns. You can also create a `.islandsignore` file:
 
 ```
 # Ignore build artifacts
@@ -112,11 +112,11 @@ node_modules/
 
 ```bash
 # Index a local directory
-pythia index /path/to/project
+islands index /path/to/project
 
 # Search with natural language
-pythia search "how does authentication work"
+islands search "how does authentication work"
 
 # Watch for changes
-pythia watch /path/to/project
+islands watch /path/to/project
 ```

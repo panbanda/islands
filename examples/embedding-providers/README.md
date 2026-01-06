@@ -4,7 +4,7 @@ Configure different embedding providers for semantic search.
 
 ## Available Providers
 
-Pythia supports multiple embedding providers through the `embed_anything` crate:
+Islands supports multiple embedding providers through the `embed_anything` crate:
 
 | Provider | Type | Models | Cost |
 |----------|------|--------|------|
@@ -17,7 +17,7 @@ Pythia supports multiple embedding providers through the `embed_anything` crate:
 Best for development and privacy-sensitive use cases.
 
 ```rust
-use pythia_indexer::EmbeddingConfig;
+use islands_indexer::EmbeddingConfig;
 
 // Use a preset model (downloaded automatically)
 let config = EmbeddingConfig::Local {
@@ -48,7 +48,7 @@ let config = EmbeddingConfig::Local {
 Best for production with high-quality embeddings.
 
 ```rust
-use pythia_indexer::EmbeddingConfig;
+use islands_indexer::EmbeddingConfig;
 
 let config = EmbeddingConfig::OpenAI {
     model: "text-embedding-3-small".to_string(),
@@ -70,7 +70,7 @@ let config = EmbeddingConfig::OpenAI {
 Excellent multilingual support.
 
 ```rust
-use pythia_indexer::EmbeddingConfig;
+use islands_indexer::EmbeddingConfig;
 
 let config = EmbeddingConfig::Cohere {
     model: "embed-english-v3.0".to_string(),

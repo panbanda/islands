@@ -1,10 +1,10 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: pythia
-  namespace: pythia
+  name: islands
+  namespace: islands
   labels:
-    app.kubernetes.io/name: pythia
+    app.kubernetes.io/name: islands
 spec:
   type: ClusterIP
   ports:
@@ -17,32 +17,32 @@ spec:
       targetPort: webhook
       protocol: TCP
   selector:
-    app.kubernetes.io/name: pythia
+    app.kubernetes.io/name: islands
 ---
 # Optional: Ingress for external webhook access
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: pythia-webhook
-  namespace: pythia
+  name: islands-webhook
+  namespace: islands
   labels:
-    app.kubernetes.io/name: pythia
+    app.kubernetes.io/name: islands
   annotations:
     kubernetes.io/ingress.class: nginx
     # cert-manager.io/cluster-issuer: letsencrypt-prod
 spec:
   rules:
-    - host: pythia-webhook.example.com  # Replace with your domain
+    - host: islands-webhook.example.com  # Replace with your domain
       http:
         paths:
           - path: /webhook
             pathType: Prefix
             backend:
               service:
-                name: pythia
+                name: islands
                 port:
                   number: 9000
   # tls:
   #   - hosts:
-  #       - pythia-webhook.example.com
-  #     secretName: pythia-webhook-tls
+  #       - islands-webhook.example.com
+  #     secretName: islands-webhook-tls

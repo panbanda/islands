@@ -1,10 +1,10 @@
 # MCP Server Integration
 
-Use Pythia as a Model Context Protocol (MCP) server for AI assistants.
+Use Islands as a Model Context Protocol (MCP) server for AI assistants.
 
 ## Overview
 
-The MCP server exposes Pythia's search capabilities as tools that AI assistants (like Claude) can use to search and understand codebases.
+The MCP server exposes Islands's search capabilities as tools that AI assistants (like Claude) can use to search and understand codebases.
 
 ## Available Tools
 
@@ -21,10 +21,10 @@ The MCP server exposes Pythia's search capabilities as tools that AI assistants 
 
 ```bash
 # Start MCP server on stdio
-pythia mcp
+islands mcp
 
 # Or with explicit transport
-pythia mcp --transport stdio
+islands mcp --transport stdio
 ```
 
 ### With Claude Desktop
@@ -34,11 +34,11 @@ Add to your Claude Desktop config (`~/.config/claude/mcp.json`):
 ```json
 {
   "mcpServers": {
-    "pythia": {
-      "command": "pythia",
+    "islands": {
+      "command": "islands",
       "args": ["mcp"],
       "env": {
-        "PYTHIA_CONFIG": "/path/to/config.toml"
+        "ISLANDS_CONFIG": "/path/to/config.toml"
       }
     }
   }
@@ -48,11 +48,11 @@ Add to your Claude Desktop config (`~/.config/claude/mcp.json`):
 ### With Claude Code
 
 ```bash
-# Add Pythia as an MCP server
-claude mcp add pythia -- pythia mcp
+# Add Islands as an MCP server
+claude mcp add islands -- islands mcp
 
 # Or with custom config
-claude mcp add pythia -- pythia mcp --config /path/to/config.toml
+claude mcp add islands -- islands mcp --config /path/to/config.toml
 ```
 
 ## Tool Schemas
@@ -114,12 +114,12 @@ claude mcp add pythia -- pythia mcp --config /path/to/config.toml
 ```
 User: How does the authentication middleware work in the API?
 
-Claude: [Uses pythia.search tool]
+Claude: [Uses islands.search tool]
 Query: "authentication middleware implementation"
 
 [Results show relevant files]
 
-Claude: [Uses pythia.get_file tool]
+Claude: [Uses islands.get_file tool]
 Repository: "myorg/api-server"
 Path: "src/middleware/auth.rs"
 
@@ -129,8 +129,8 @@ Claude: Based on the code, the authentication middleware works by...
 ## Programmatic Usage
 
 ```rust
-use pythia_mcp::{McpServer, McpConfig};
-use pythia_indexer::IndexerService;
+use islands_mcp::{McpServer, McpConfig};
+use islands_indexer::IndexerService;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -139,7 +139,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Create MCP server
     let config = McpConfig {
-        name: "pythia".to_string(),
+        name: "islands".to_string(),
         version: env!("CARGO_PKG_VERSION").to_string(),
     };
 
@@ -155,10 +155,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ## Configuration
 
 ```toml
-# pythia-mcp.toml
+# islands-mcp.toml
 
 [mcp]
-name = "pythia"
+name = "islands"
 version = "0.1.0"
 
 [mcp.capabilities]

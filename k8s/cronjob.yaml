@@ -1,10 +1,10 @@
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: pythia-sync
-  namespace: pythia
+  name: islands-sync
+  namespace: islands
   labels:
-    app.kubernetes.io/name: pythia
+    app.kubernetes.io/name: islands
     app.kubernetes.io/component: sync
 spec:
   schedule: "*/30 * * * *"  # Every 30 minutes
@@ -15,7 +15,7 @@ spec:
     spec:
       template:
         spec:
-          serviceAccountName: pythia
+          serviceAccountName: islands
           securityContext:
             runAsUser: 1000
             runAsGroup: 1000
@@ -23,20 +23,20 @@ spec:
           restartPolicy: OnFailure
           containers:
             - name: sync
-              image: pythia:latest
+              image: islands:latest
               imagePullPolicy: IfNotPresent
               command:
-                - pythia
+                - islands
                 - sync
                 - --all
               envFrom:
                 - configMapRef:
-                    name: pythia-config
+                    name: islands-config
                 - secretRef:
-                    name: pythia-secrets
+                    name: islands-secrets
               volumeMounts:
                 - name: data
-                  mountPath: /data/pythia
+                  mountPath: /data/islands
               resources:
                 requests:
                   memory: "256Mi"
@@ -47,4 +47,4 @@ spec:
           volumes:
             - name: data
               persistentVolumeClaim:
-                claimName: pythia-data
+                claimName: islands-data

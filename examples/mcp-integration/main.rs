@@ -1,14 +1,14 @@
 //! MCP Server integration example
 //!
-//! Run Pythia as an MCP server for AI assistant integration.
+//! Run Islands as an MCP server for AI assistant integration.
 
 use std::path::PathBuf;
 
-use pythia_indexer::{IndexerConfig, IndexerService};
-use pythia_mcp::{McpConfig, McpServer};
+use islands_indexer::{IndexerConfig, IndexerService};
+use islands_mcp::{McpConfig, McpServer};
 
 #[cfg(feature = "embeddings")]
-use pythia_indexer::EmbeddingConfig;
+use islands_indexer::EmbeddingConfig;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -40,7 +40,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Create MCP server configuration
     let mcp_config = McpConfig {
-        name: "pythia".to_string(),
+        name: "islands".to_string(),
         version: env!("CARGO_PKG_VERSION").to_string(),
     };
 

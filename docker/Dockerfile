@@ -1,4 +1,4 @@
-# Pythia - Codebase Indexing and Inquiry System
+# Islands - Codebase Indexing and Inquiry System
 # Multi-stage build for optimized container size
 
 FROM python:3.12-slim AS builder
@@ -27,7 +27,7 @@ RUN uv pip install --no-cache-dir .
 # Production image
 FROM python:3.12-slim
 
-LABEL maintainer="Pythia Contributors"
+LABEL maintainer="Islands Contributors"
 LABEL description="Codebase Indexing and Inquiry System using LEANN"
 LABEL version="0.1.0"
 
@@ -38,7 +38,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     openssh-client \
     && rm -rf /var/lib/apt/lists/* \
-    && useradd -m -u 1000 pythia
+    && useradd -m -u 1000 islands
 
 # Copy virtual environment from builder
 COPY --from=builder /opt/venv /opt/venv
@@ -47,27 +47,27 @@ ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 
 # Create data directories
-RUN mkdir -p /data/pythia/{repos,indexes,cache} \
-    && chown -R pythia:pythia /data/pythia
+RUN mkdir -p /data/islands/{repos,indexes,cache} \
+    && chown -R islands:islands /data/islands
 
 # Copy source code
-COPY --chown=pythia:pythia src/ ./src/
+COPY --chown=islands:islands src/ ./src/
 
 # Set default environment variables
-ENV PYTHIA_STORAGE__BASE_PATH=/data/pythia
-ENV PYTHIA_STORAGE__REPOS_PATH=/data/pythia/repos
-ENV PYTHIA_STORAGE__INDEXES_PATH=/data/pythia/indexes
-ENV PYTHIA_STORAGE__CACHE_PATH=/data/pythia/cache
-ENV PYTHIA_LOG_LEVEL=INFO
+ENV ISLANDS_STORAGE__BASE_PATH=/data/islands
+ENV ISLANDS_STORAGE__REPOS_PATH=/data/islands/repos
+ENV ISLANDS_STORAGE__INDEXES_PATH=/data/islands/indexes
+ENV ISLANDS_STORAGE__CACHE_PATH=/data/islands/cache
+ENV ISLANDS_LOG_LEVEL=INFO
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import pythia; print('healthy')" || exit 1
+    CMD python -c "import islands; print('healthy')" || exit 1
 
-USER pythia
+USER islands
 
 # Default command runs the MCP server
-CMD ["pythia-mcp"]
+CMD ["islands-mcp"]
 
 # Expose MCP and webhook ports
 EXPOSE 8080 9000

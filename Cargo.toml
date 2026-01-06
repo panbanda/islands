@@ -1,12 +1,12 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/pythia-core",
-    "crates/pythia-providers",
-    "crates/pythia-indexer",
-    "crates/pythia-mcp",
-    "crates/pythia-cli",
-    "crates/pythia-agent",
+    "crates/islands-core",
+    "crates/islands-providers",
+    "crates/islands-indexer",
+    "crates/islands-mcp",
+    "crates/islands-cli",
+    "crates/islands-agent",
 ]
 
 [workspace.package]
@@ -14,20 +14,20 @@ version = "0.1.0"
 edition = "2024"
 rust-version = "1.92"
 license = "MIT"
-authors = ["Pythia Contributors"]
-repository = "https://github.com/panbanda/pythia"
-documentation = "https://github.com/panbanda/pythia#readme"
+authors = ["Islands Contributors"]
+repository = "https://github.com/panbanda/islands"
+documentation = "https://github.com/panbanda/islands#readme"
 keywords = ["mcp", "semantic-search", "codebase-indexing", "leann", "rag", "vector-database"]
 categories = ["command-line-utilities", "development-tools", "science"]
 
 [workspace.dependencies]
 # Internal crates
-pythia-core = { path = "crates/pythia-core" }
-pythia-providers = { path = "crates/pythia-providers" }
-pythia-indexer = { path = "crates/pythia-indexer" }
-pythia-mcp = { path = "crates/pythia-mcp" }
-pythia-cli = { path = "crates/pythia-cli" }
-pythia-agent = { path = "crates/pythia-agent" }
+islands-core = { path = "crates/islands-core" }
+islands-providers = { path = "crates/islands-providers" }
+islands-indexer = { path = "crates/islands-indexer" }
+islands-mcp = { path = "crates/islands-mcp" }
+islands-cli = { path = "crates/islands-cli" }
+islands-agent = { path = "crates/islands-agent" }
 
 # Async runtime
 tokio = { version = "1.43", features = ["full"] }

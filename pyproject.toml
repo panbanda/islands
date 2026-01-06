@@ -3,14 +3,14 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "pythia"
+name = "islands"
 version = "0.1.0"
 description = "A codebase indexing and inquiry system using LEANN for semantic search with MCP interface"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
 authors = [
-    { name = "Pythia Contributors" }
+    { name = "Islands Contributors" }
 ]
 keywords = [
     "mcp",
@@ -68,18 +68,18 @@ kubernetes = [
 ]
 
 [project.scripts]
-pythia = "pythia.cli:main"
-pythia-mcp = "pythia.mcp_server:main"
-pythia-agent = "pythia.agent:main"
+islands = "islands.cli:main"
+islands-mcp = "islands.mcp_server:main"
+islands-agent = "islands.agent:main"
 
 [project.urls]
-Homepage = "https://github.com/panbanda/pythia"
-Documentation = "https://github.com/panbanda/pythia#readme"
-Repository = "https://github.com/panbanda/pythia"
-Issues = "https://github.com/panbanda/pythia/issues"
+Homepage = "https://github.com/panbanda/islands"
+Documentation = "https://github.com/panbanda/islands#readme"
+Repository = "https://github.com/panbanda/islands"
+Issues = "https://github.com/panbanda/islands/issues"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/pythia"]
+packages = ["src/islands"]
 
 [tool.ruff]
 target-version = "py310"
@@ -101,7 +101,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["pythia"]
+known-first-party = ["islands"]
 
 [tool.mypy]
 python_version = "3.10"
@@ -113,19 +113,19 @@ check_untyped_defs = false
 
 [[tool.mypy.overrides]]
 module = [
-    "pythia.providers.*",
-    "pythia.agent.*",
-    "pythia.storage.watcher",
+    "islands.providers.*",
+    "islands.agent.*",
+    "islands.storage.watcher",
 ]
 ignore_errors = true
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
-addopts = "-v --cov=pythia --cov-report=term-missing"
+addopts = "-v --cov=islands --cov-report=term-missing"
 
 [tool.coverage.run]
-source = ["src/pythia"]
+source = ["src/islands"]
 branch = true
 
 [tool.coverage.report]

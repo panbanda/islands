@@ -1,32 +1,32 @@
 version: "3.8"
 
 services:
-  pythia:
+  islands:
     build:
       context: ..
       dockerfile: docker/Dockerfile
-    container_name: pythia
+    container_name: islands
     restart: unless-stopped
     ports:
       - "8080:8080"  # MCP server
       - "9000:9000"  # Webhook receiver
     environment:
-      - PYTHIA_DEBUG=false
-      - PYTHIA_LOG_LEVEL=INFO
-      - PYTHIA_OPENAI_API_KEY=${OPENAI_API_KEY}
-      - PYTHIA_SYNC_INTERVAL=300
-      - PYTHIA_MAX_CONCURRENT_SYNCS=4
+      - ISLANDS_DEBUG=false
+      - ISLANDS_LOG_LEVEL=INFO
+      - ISLANDS_OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ISLANDS_SYNC_INTERVAL=300
+      - ISLANDS_MAX_CONCURRENT_SYNCS=4
       # GitHub provider
-      - PYTHIA_PROVIDERS__0__TYPE=github
-      - PYTHIA_PROVIDERS__0__TOKEN=${GITHUB_TOKEN}
+      - ISLANDS_PROVIDERS__0__TYPE=github
+      - ISLANDS_PROVIDERS__0__TOKEN=${GITHUB_TOKEN}
       # GitLab provider (optional)
-      - PYTHIA_PROVIDERS__1__TYPE=gitlab
-      - PYTHIA_PROVIDERS__1__TOKEN=${GITLAB_TOKEN}
+      - ISLANDS_PROVIDERS__1__TYPE=gitlab
+      - ISLANDS_PROVIDERS__1__TOKEN=${GITLAB_TOKEN}
     volumes:
-      - pythia-data:/data/pythia
-      - ~/.ssh:/home/pythia/.ssh:ro  # For SSH-based cloning
+      - islands-data:/data/islands
+      - ~/.ssh:/home/islands/.ssh:ro  # For SSH-based cloning
     healthcheck:
-      test: ["CMD", "python", "-c", "import pythia"]
+      test: ["CMD", "python", "-c", "import islands"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -34,13 +34,13 @@ services:
   # Optional: Redis for caching (future enhancement)
   # redis:
   #   image: redis:7-alpine
-  #   container_name: pythia-redis
+  #   container_name: islands-redis
   #   restart: unless-stopped
   #   volumes:
   #     - redis-data:/data
 
 volumes:
-  pythia-data:
+  islands-data:
     driver: local
   # redis-data:
   #   driver: local
