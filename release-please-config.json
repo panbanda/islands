@@ -1,0 +1,12 @@
+{
+  "packages": {
+    ".": {
+      "release-type": "rust",
+      "component": "islands"
+    },
+    ".claude/skills": {
+      "release-type": "simple",
+      "component": "islands-skills"
+    }
+  }
+}
