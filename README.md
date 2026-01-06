@@ -1,62 +1,202 @@
+<div align="center">
+
 # Islands
+
+<img src="assets/islands-header.png" alt="Islands - Low-Storage Vector Search for Codebases" width="100%">
 
 [![CI](https://github.com/panbanda/islands/actions/workflows/rust.yaml/badge.svg)](https://github.com/panbanda/islands/actions/workflows/rust.yaml)
 [![Crates.io](https://img.shields.io/crates/v/islands-cli.svg)](https://crates.io/crates/islands-cli)
 [![Rust](https://img.shields.io/badge/rust-stable-orange.svg)](https://www.rust-lang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**Islands** is a high-performance codebase indexing and semantic search system written in Rust, built on the LEANN algorithm. It provides an MCP (Model Context Protocol) interface for AI assistants and supports multi-provider git integration.
+**Your codebases were isolated, scattered, unknowable islands. Welcome to the vibrant, interconnected archipelago.**
 
-## LEANN: Low-Storage Vector Search
+Islands implements the [LEANN algorithm](https://arxiv.org/abs/2506.08276) to index and search across codebases with ~95% storage reduction. Store the map, not the territory. Recompute what you need, when you need it.
 
-Islands implements the [LEANN algorithm](https://arxiv.org/abs/2506.08276) (arXiv:2506.08276) for efficient vector similarity search:
+**Why "Islands"?** Every codebase is an island - isolated, self-contained, surrounded by the vast ocean of everything else you've forgotten. Need to find that authentication pattern from three projects ago? Good luck sailing through git histories and grep results. Islands builds bridges between your codebases without requiring you to store massive embedding vectors everywhere. The LEANN algorithm stores only the graph structure (the map of which code relates to which) and recomputes embeddings on-demand during search. Your codebases stay on their islands; `islands` just knows how to navigate between them.
 
-> "LEANN reduces storage requirements to approximately 5% of original data size" by storing only the graph structure and recomputing embeddings on-the-fly during search.
+</div>
 
-**Key features from the paper:**
-
-- **Graph-only storage**: Stores proximity graph in CSR format, not embeddings. Storage scales with edge count $O(n \cdot M)$, not embedding dimension $O(n \cdot d)$.
-- **Selective recomputation**: Embeddings computed on-demand only for nodes in the search path.
-- **High-degree preserving pruning**: Hub nodes (top 2% by degree) retain more connections to maintain graph navigability.
-- **Parameters**: $M = 30$ connections per node, $\text{efConstruction} = 128$ (from Section 5 of paper).
-
-For typical embedding dimensions ($d = 768\text{--}4096$) with $M = 30$, this yields ~25x storage reduction.
+---
 
 ## Features
 
-- **LEANN Core** (Rust): High-performance vector indexing with ~95% storage savings
-- **Multi-Provider Support**: GitHub, GitLab, Bitbucket, and Gitea integration
-- **MCP Interface**: Integrates with Claude Code and other MCP-compatible AI assistants
-- **OpenAI Agent**: Interactive Q&A using OpenAI's SDK
-- **Kubernetes Native**: Designed for EFS storage with automatic sync and webhooks
+<details>
+<summary><strong>LEANN Vector Search</strong> - Store the graph, not the embeddings</summary>
 
-## Quick Start
+Traditional vector search stores full embeddings for every chunk of code - typically 768 to 4096 floats per chunk. For a large codebase, this means gigabytes of storage just for the index.
 
-### Installation
+LEANN (Low-storage Embedding-based Approximate Nearest Neighbor) takes a different approach:
+
+- **Graph-only storage**: Store the proximity graph in CSR format, not the embeddings
+- **On-demand recomputation**: Compute embeddings only for nodes actually visited during search
+- **Storage scales with edges**: $O(n \cdot M)$ instead of $O(n \cdot d)$ where $M \approx 30$ and $d \approx 768\text{--}4096$
+
+For typical embedding dimensions, this yields **~25x storage reduction**.
+
+**Parameters from the paper (Section 5):**
+- $M = 30$ connections per node
+- $\text{efConstruction} = 128$
+- High-degree preserving pruning: hub nodes (top 2%) retain more connections
+
+**Why it matters:** [Wang et al. (2025)](https://arxiv.org/abs/2506.08276) demonstrated that for retrieval-augmented generation workloads, you don't need to store embeddings permanently. The cost of recomputing a few embeddings during search is negligible compared to the storage savings. This makes it practical to index many codebases without requiring massive storage infrastructure.
+
+> [!TIP]
+> Use LEANN when indexing multiple repositories or when storage is constrained. The search latency penalty is minimal for typical query workloads.
+
+</details>
+
+<details>
+<summary><strong>Multi-Provider Git Integration</strong> - One interface, any git host</summary>
+
+Islands supports repositories from multiple git providers through a unified interface:
+
+| Provider | URL Formats |
+|----------|-------------|
+| GitHub | `github.com/owner/repo`, `git@github.com:owner/repo.git` |
+| GitLab | `gitlab.com/owner/repo`, `git@gitlab.com:owner/repo.git` |
+| Bitbucket | `bitbucket.org/owner/repo` |
+| Gitea | Any self-hosted Gitea instance |
+
+Each provider implements the same async trait, handling:
+- Repository cloning and updates
+- Branch and tag enumeration
+- File content retrieval
+- Webhook integration for automatic sync
+
+**Why it matters:** Your code doesn't live in one place. Some projects are on GitHub, others on GitLab, maybe some on a self-hosted Gitea instance. Islands doesn't care - add any repository by URL and search across all of them uniformly.
+
+> [!TIP]
+> Set provider tokens via environment variables (`GITHUB_TOKEN`, `GITLAB_TOKEN`) to access private repositories.
+
+</details>
+
+<details>
+<summary><strong>MCP Server</strong> - AI assistant integration via Model Context Protocol</summary>
+
+Islands includes a Model Context Protocol (MCP) server that exposes semantic search to AI assistants like Claude. This enables natural language queries across your indexed codebases.
+
+**Available tools:**
+
+| Tool | Description |
+|------|-------------|
+| `islands_list` | List all indexed codebases |
+| `islands_search` | Semantic search across codebases |
+| `islands_add_repo` | Add and index a repository by URL |
+| `islands_sync` | Sync and re-index a repository |
+| `islands_status` | Get index status and statistics |
+
+**Example queries once configured:**
+
+- "Find authentication middleware implementations"
+- "Show me how error handling is done in the payment service"
+- "Find examples of database connection pooling"
+
+**Why it matters:** AI assistants work best when they can access relevant code context. MCP is the emerging standard for tool integration, and Islands provides semantic search as a first-class MCP tool. Instead of copying code into prompts, the assistant can search your indexed codebases directly.
+
+> [!TIP]
+> Configure Islands as an MCP server in Claude Code with `claude mcp add islands-server -- islands-mcp`
+
+</details>
+
+<details>
+<summary><strong>Interactive Agent</strong> - Q&A sessions via OpenAI-compatible APIs</summary>
+
+Islands includes an agent for interactive exploration of your codebases, compatible with any OpenAI SDK-supported API (OpenAI, Azure OpenAI, local models, etc.). The agent uses function calling to search, retrieve, and explain code.
 
 ```bash
-# Install via Homebrew (macOS/Linux)
-brew tap panbanda/islands
-brew install islands
+# Start an interactive session
+islands ask
 
-# Or install via Cargo
+# The agent can:
+# - Search across all indexed codebases
+# - Explain code patterns and implementations
+# - Compare approaches across different projects
+# - Answer questions about your codebase architecture
+```
+
+**Configuration:**
+
+```yaml
+agent:
+  model: gpt-4o
+  temperature: 0.1
+  max_tokens: 4096
+```
+
+**Why it matters:** Sometimes you need a conversation, not just search results. The agent maintains context across questions, can follow up on previous answers, and explains code in natural language. It's particularly useful for onboarding to unfamiliar codebases or exploring architectural patterns.
+
+> [!TIP]
+> Set `ISLANDS_OPENAI_API_KEY` to enable the agent. Lower temperature (0.1) produces more focused, deterministic responses.
+
+</details>
+
+<details>
+<summary><strong>Kubernetes Native</strong> - EFS storage with automatic sync</summary>
+
+Islands is designed for deployment on Kubernetes with shared storage:
+
+- **EFS/NFS support**: Indexes stored on shared filesystem accessible by all pods
+- **Automatic sync**: Configurable interval for pulling updates from repositories
+- **Webhook integration**: Real-time sync on push events
+- **Horizontal scaling**: Multiple instances can serve search requests
+
+**Deployment architecture:**
+
+```mermaid
+flowchart LR
+    subgraph Pods
+        P1[Islands Pod]
+        P2[Islands Pod]
+    end
+
+    subgraph Storage
+        EFS[("EFS Volume<br/>/data/islands<br/>├── repos/<br/>└── indexes/")]
+    end
+
+    subgraph External
+        Git[Git Providers<br/>webhooks]
+    end
+
+    P1 --> EFS
+    P2 --> EFS
+    Git --> Pods
+```
+
+**Why it matters:** Running Islands as a service means your AI assistants always have access to up-to-date code context. The shared storage model ensures consistency across replicas, and webhooks keep indexes fresh without polling.
+
+> [!TIP]
+> Use `kubectl apply -k k8s/` to deploy. Configure webhooks in your git providers pointing to the Ingress endpoint.
+
+</details>
+
+## Installation
+
+### Homebrew (macOS/Linux)
+
+```bash
+brew install panbanda/islands/islands
+```
+
+### Cargo
+
+```bash
 cargo install islands-cli
+```
 
-# Or build from source
+### Build from Source
+
+```bash
 git clone https://github.com/panbanda/islands.git
 cd islands
 cargo build --release
 ```
 
-### Basic Usage
+## Quick Start
 
 ```bash
 # Add a repository by URL
 islands add https://github.com/owner/repo --token $GITHUB_TOKEN
-
-# Supports various URL formats
-islands add https://gitlab.com/owner/repo
-islands add git@github.com:owner/repo.git
 
 # Search across indexed codebases
 islands search "authentication middleware"
@@ -64,49 +204,26 @@ islands search "authentication middleware"
 # List all indexes
 islands list
 
-# Start the MCP server
+# Start the MCP server for AI assistant integration
 islands serve
 
-# Interactive Q&A session
+# Interactive Q&A session (requires OpenAI-compatible API)
 islands ask
-```
-
-### Docker
-
-```bash
-# Build the image
-docker build -t islands -f docker/Dockerfile .
-
-# Run with docker-compose
-docker-compose -f docker/docker-compose.yml up
-```
-
-### Kubernetes
-
-```bash
-# Deploy to Kubernetes
-kubectl apply -k k8s/
-
-# Or with kustomize
-kustomize build k8s/ | kubectl apply -f -
 ```
 
 ## Configuration
 
-Islands is configured through environment variables or a config file.
+Islands is configured through environment variables or a config file (`islands.yaml`).
 
 ### Environment Variables
 
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `ISLANDS_DEBUG` | Enable debug mode | `false` |
-| `ISLANDS_LOG_LEVEL` | Log level | `INFO` |
+| `ISLANDS_LOG_LEVEL` | Log level (DEBUG, INFO, WARN, ERROR) | `INFO` |
 | `ISLANDS_OPENAI_API_KEY` | OpenAI API key for agent | - |
 | `ISLANDS_SYNC_INTERVAL` | Sync interval in seconds | `300` |
-| `ISLANDS_MAX_CONCURRENT_SYNCS` | Max concurrent syncs | `4` |
 | `ISLANDS_STORAGE__BASE_PATH` | Base storage path | `/data/islands` |
-| `ISLANDS_PROVIDERS__0__TYPE` | First provider type | - |
-| `ISLANDS_PROVIDERS__0__TOKEN` | First provider token | - |
 
 ### Config File
 
@@ -137,53 +254,47 @@ agent:
 
 ## MCP Integration
 
-Islands provides an MCP server for integration with Claude Code and other AI assistants.
-
-### Available Tools
-
-| Tool | Description |
-|------|-------------|
-| `islands_list` | List all indexed codebases |
-| `islands_search` | Semantic search across codebases |
-| `islands_add_repo` | Add and index a repository by URL |
-| `islands_sync` | Sync and re-index a repository |
-| `islands_status` | Get index status |
-
-### Claude Code Integration
+### Claude Code
 
 ```bash
-# Add Islands as an MCP server
 claude mcp add islands-server -- islands-mcp
+```
+
+### Claude Desktop
+
+Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "islands": {
+      "command": "islands-mcp"
+    }
+  }
+}
 ```
 
 ## Architecture
 
-Islands is built entirely in Rust as a workspace of specialized crates:
+Islands is a Rust workspace implementing LEANN for low-storage vector search:
 
-```
-islands/
-├── crates/
-│   ├── islands-core/          # LEANN implementation (arXiv:2506.08276)
-│   │   ├── leann.rs           # LeannIndex, CsrGraph, EmbeddingProvider
-│   │   ├── hnsw.rs            # Traditional HNSW (for comparison)
-│   │   ├── pq.rs              # Product Quantization
-│   │   ├── distance.rs        # Distance metrics (cosine, euclidean, dot)
-│   │   └── search.rs          # Search algorithms
-│   │
-│   ├── islands-providers/     # Git provider implementations
-│   │   ├── github.rs          # GitHub API
-│   │   ├── gitlab.rs          # GitLab API
-│   │   ├── bitbucket.rs       # Bitbucket API
-│   │   └── gitea.rs           # Gitea API
-│   │
-│   ├── islands-indexer/       # Repository indexing service
-│   ├── islands-mcp/           # MCP server for AI assistants
-│   ├── islands-agent/         # OpenAI agent integration
-│   └── islands-cli/           # Command-line interface
-│
-├── k8s/                       # Kubernetes manifests
-├── docker/                    # Docker configuration
-└── examples/                  # Usage examples
+```mermaid
+flowchart TD
+    CLI[islands-cli<br/>binary]
+    MCP[islands-mcp<br/>MCP server]
+    Agent[islands-agent<br/>OpenAI-compatible]
+    Indexer[islands-indexer]
+    Core[islands-core<br/>LEANN/HNSW/PQ]
+    Providers[islands-providers<br/>GitHub/GitLab/Bitbucket/Gitea]
+
+    CLI --> MCP
+    CLI --> Agent
+    CLI --> Indexer
+    MCP --> Indexer
+    MCP --> Core
+    Agent --> Core
+    Indexer --> Core
+    Indexer --> Providers
 ```
 
 ### Crates
@@ -194,23 +305,18 @@ islands/
 | `islands-providers` | Git provider implementations (GitHub, GitLab, Bitbucket, Gitea) |
 | `islands-indexer` | Code chunking, embedding generation, file watching |
 | `islands-mcp` | MCP server for AI assistant integration |
-| `islands-agent` | OpenAI agent for interactive Q&A |
+| `islands-agent` | Interactive agent for Q&A (OpenAI-compatible) |
 | `islands-cli` | Command-line interface |
 
+### Core Algorithms
+
+- **leann.rs**: `LeannIndex` with `CsrGraph` for graph-only storage, `EmbeddingProvider` trait for on-demand recomputation
+- **hnsw.rs**: Traditional HNSW implementation for comparison
+- **pq.rs**: Product Quantization for vector compression
+- **distance.rs**: Cosine, Euclidean, dot product metrics
+- **search.rs**: Two-level search with approximate/exact distance queues
+
 ## Development
-
-### Setup
-
-```bash
-# Clone the repository
-git clone https://github.com/panbanda/islands.git
-cd islands
-
-# Install Rust toolchain
-rustup update stable
-```
-
-### Running Tests
 
 ```bash
 # Run all tests
@@ -219,87 +325,55 @@ cargo test --workspace
 # Run tests for a specific crate
 cargo test -p islands-core
 
-# Run with logging
-RUST_LOG=debug cargo test
-
-# Run doc tests
-cargo test --doc
-```
-
-### Code Quality
-
-```bash
-# Format code
+# Format and lint
 cargo fmt
-
-# Run linter
 cargo clippy --all-targets -- -D warnings
 
 # Build documentation
 cargo doc --no-deps
-```
 
-### Benchmarks
-
-```bash
 # Run benchmarks
 cargo bench -p islands-core
 ```
 
-## Kubernetes Deployment
+## Docker
 
-### Prerequisites
+```bash
+# Build the image
+docker build -t islands -f docker/Dockerfile .
 
-- Kubernetes cluster with EFS CSI driver
-- EFS filesystem mounted as a StorageClass
+# Run with docker-compose
+docker-compose -f docker/docker-compose.yml up
+```
 
-### Deployment Steps
+## Kubernetes
 
-1. **Create namespace and secrets**:
-   ```bash
-   kubectl create namespace islands
-   kubectl create secret generic islands-secrets \
-     --from-literal=ISLANDS_OPENAI_API_KEY=$OPENAI_API_KEY \
-     --from-literal=ISLANDS_PROVIDERS__0__TOKEN=$GITHUB_TOKEN \
-     -n islands
-   ```
+```bash
+# Deploy to Kubernetes
+kubectl apply -k k8s/
 
-2. **Configure EFS StorageClass**:
-   ```yaml
-   apiVersion: storage.k8s.io/v1
-   kind: StorageClass
-   metadata:
-     name: efs-sc
-   provisioner: efs.csi.aws.com
-   parameters:
-     provisioningMode: efs-ap
-     fileSystemId: fs-xxxxxxxxx
-   ```
-
-3. **Deploy Islands**:
-   ```bash
-   kubectl apply -k k8s/
-   ```
-
-4. **Configure webhooks** (optional):
-   Set up webhooks in your git providers pointing to the Ingress endpoint.
+# Create secrets
+kubectl create namespace islands
+kubectl create secret generic islands-secrets \
+  --from-literal=ISLANDS_OPENAI_API_KEY=$OPENAI_API_KEY \
+  --from-literal=ISLANDS_PROVIDERS__0__TOKEN=$GITHUB_TOKEN \
+  -n islands
+```
 
 ## Contributing
 
-Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md) for details.
-
 1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'feat: add amazing feature'`)
 4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+5. Create a Pull Request
 
 ## References
 
 - **LEANN Paper**: Wang et al., "LEANN: A Low-Storage Embedding-based Retrieval System for Large Scale Generative AI Applications" ([arXiv:2506.08276](https://arxiv.org/abs/2506.08276))
 - **LEANN Implementation**: [github.com/yichuan-w/LEANN](https://github.com/yichuan-w/LEANN)
 - **MCP Specification**: [modelcontextprotocol.io](https://modelcontextprotocol.io/)
+
+## License
+
+MIT License - see [LICENSE](LICENSE) for details.
