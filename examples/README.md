@@ -93,19 +93,30 @@ export GITHUB_TOKEN="ghp_..."
 
 ## Quick Start
 
-1. **Index a repository**
+1. **Create a repository from URL**
+   ```rust
+   use pythia_providers::Repository;
+
+   // All of these work:
+   let repo = Repository::from_url("tokio-rs/tokio")?;
+   let repo = Repository::from_url("https://github.com/tokio-rs/tokio")?;
+   let repo = Repository::from_url("github:tokio-rs/tokio")?;
+   let repo = Repository::from_url("git@github.com:tokio-rs/tokio.git")?;
+   ```
+
+2. **Index a repository**
    ```rust
    let mut service = IndexerService::new(config);
    service.init_embedder().await?;
    service.add_repository(repo).await?;
    ```
 
-2. **Search semantically**
+3. **Search semantically**
    ```rust
    let results = service.search("how does error handling work", 10, None).await?;
    ```
 
-3. **Get file contents**
+4. **Get file contents**
    ```rust
    let content = service.get_file("owner/repo", "src/main.rs").await?;
    ```
