@@ -16,12 +16,12 @@ pub mod llm;
 pub mod prompt;
 pub mod service;
 
-pub use service::IslandsAgent;
 pub use error::{Error, Result};
+pub use service::IslandsAgent;
 
 /// Re-export commonly used types
 pub mod prelude {
-    pub use super::service::IslandsAgent;
     pub use super::error::{Error, Result};
     pub use super::llm::LlmProvider;
+    pub use super::service::IslandsAgent;
 }
