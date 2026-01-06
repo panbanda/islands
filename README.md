@@ -143,20 +143,24 @@ Islands is designed for deployment on Kubernetes with shared storage:
 
 **Deployment architecture:**
 
-```
-┌─────────────────┐     ┌─────────────────┐
-│   Islands Pod   │────▶│   EFS Volume    │
-└─────────────────┘     │  /data/islands  │
-                        │  ├── repos/     │
-┌─────────────────┐     │  └── indexes/   │
-│   Islands Pod   │────▶│                 │
-└─────────────────┘     └─────────────────┘
-        │
-        ▼
-┌─────────────────┐
-│  Git Providers  │
-│  (webhooks)     │
-└─────────────────┘
+```mermaid
+flowchart LR
+    subgraph Pods
+        P1[Islands Pod]
+        P2[Islands Pod]
+    end
+
+    subgraph Storage
+        EFS[("EFS Volume<br/>/data/islands<br/>├── repos/<br/>└── indexes/")]
+    end
+
+    subgraph External
+        Git[Git Providers<br/>webhooks]
+    end
+
+    P1 --> EFS
+    P2 --> EFS
+    Git --> Pods
 ```
 
 **Why it matters:** Running Islands as a service means your AI assistants always have access to up-to-date code context. The shared storage model ensures consistency across replicas, and webhooks keep indexes fresh without polling.
@@ -275,16 +279,23 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
 Islands is a Rust workspace implementing LEANN for low-storage vector search:
 
-```
-islands-cli (binary)
-    ├── islands-mcp (MCP server)
-    │   ├── islands-indexer
-    │   │   ├── islands-core (LEANN/HNSW/PQ)
-    │   │   └── islands-providers (GitHub/GitLab/Bitbucket/Gitea)
-    │   └── islands-core
-    ├── islands-agent (OpenAI-compatible agent)
-    │   └── islands-core
-    └── islands-indexer
+```mermaid
+flowchart TD
+    CLI[islands-cli<br/>binary]
+    MCP[islands-mcp<br/>MCP server]
+    Agent[islands-agent<br/>OpenAI-compatible]
+    Indexer[islands-indexer]
+    Core[islands-core<br/>LEANN/HNSW/PQ]
+    Providers[islands-providers<br/>GitHub/GitLab/Bitbucket/Gitea]
+
+    CLI --> MCP
+    CLI --> Agent
+    CLI --> Indexer
+    MCP --> Indexer
+    MCP --> Core
+    Agent --> Core
+    Indexer --> Core
+    Indexer --> Providers
 ```
 
 ### Crates
