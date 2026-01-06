@@ -84,7 +84,11 @@ jobs:
           cp target/${{ matrix.target }}/release/islands dist/
           cd dist
           tar -czvf "${ARCHIVE_NAME}.tar.gz" islands
-          sha256sum "${ARCHIVE_NAME}.tar.gz" > "${ARCHIVE_NAME}.tar.gz.sha256"
+          if command -v sha256sum &> /dev/null; then
+            sha256sum "${ARCHIVE_NAME}.tar.gz" > "${ARCHIVE_NAME}.tar.gz.sha256"
+          else
+            shasum -a 256 "${ARCHIVE_NAME}.tar.gz" > "${ARCHIVE_NAME}.tar.gz.sha256"
+          fi
 
       - name: Upload release assets
         env:
