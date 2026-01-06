@@ -1,29 +1,29 @@
 ---
-name: pythia-list
-description: List all indexed codebases in Pythia
-invocation: pythia list
+name: islands-list
+description: List all indexed codebases in Islands
+invocation: islands list
 triggers:
   - list indexes
   - show indexes
   - list codebases
-  - pythia ls
+  - islands ls
 ---
 
-# Pythia List Skill
+# Islands List Skill
 
-List all codebases that have been indexed by Pythia.
+List all codebases that have been indexed by Islands.
 
 ## Usage
 
 ```bash
 # List all indexes
-pythia list
+islands list
 
 # Short alias
-pythia ls
+islands ls
 
 # Output as JSON
-pythia list --json
+islands list --json
 ```
 
 ## Parameters
@@ -63,5 +63,5 @@ frontend     /home/user/frontend     87     890 KB   2025-01-01 09:00
 
 - Use `--json` for scripting and automation
 - Check index status before searching
-- Re-index with `pythia index --force` to update
-- Delete old indexes manually from `~/.pythia/indexes/`
+- Re-index with `islands index --force` to update
+- Delete old indexes manually from `~/.islands/indexes/`

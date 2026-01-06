@@ -1,7 +1,7 @@
 ---
-name: pythia-search
-description: Search indexed codebases using Pythia's semantic search capabilities
-invocation: pythia search
+name: islands-search
+description: Search indexed codebases using Islands's semantic search capabilities
+invocation: islands search
 triggers:
   - search code
   - find in codebase
@@ -9,7 +9,7 @@ triggers:
   - search indexed
 ---
 
-# Pythia Search Skill
+# Islands Search Skill
 
 Search across indexed codebases using natural language semantic search powered by LEANN.
 
@@ -17,19 +17,19 @@ Search across indexed codebases using natural language semantic search powered b
 
 ```bash
 # Basic search
-pythia search "authentication middleware"
+islands search "authentication middleware"
 
 # Search specific index
-pythia search --index myproject "error handling"
+islands search --index myproject "error handling"
 
 # Get more results
-pythia search --limit 20 "database connection"
+islands search --limit 20 "database connection"
 
 # Output as JSON for processing
-pythia search --json "api endpoints"
+islands search --json "api endpoints"
 
 # Set similarity threshold
-pythia search --threshold 0.7 "user validation"
+islands search --threshold 0.7 "user validation"
 ```
 
 ## Parameters
@@ -46,17 +46,17 @@ pythia search --threshold 0.7 "user validation"
 
 ### Find Authentication Code
 ```bash
-pythia search "JWT token validation and refresh"
+islands search "JWT token validation and refresh"
 ```
 
 ### Search for Error Handling Patterns
 ```bash
-pythia search --index backend "error handling middleware express"
+islands search --index backend "error handling middleware express"
 ```
 
 ### Find Database Queries
 ```bash
-pythia search "SQL query builder with joins" --limit 15
+islands search "SQL query builder with joins" --limit 15
 ```
 
 ## Output Format

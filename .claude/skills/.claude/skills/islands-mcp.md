@@ -1,29 +1,29 @@
 ---
-name: pythia-mcp
-description: Start Pythia MCP server for LLM integration
-invocation: pythia serve
+name: islands-mcp
+description: Start Islands MCP server for LLM integration
+invocation: islands serve
 triggers:
   - start mcp server
-  - pythia server
+  - islands server
   - mcp integration
   - llm server
 ---
 
-# Pythia MCP Server Skill
+# Islands MCP Server Skill
 
-Start Pythia as an MCP (Model Context Protocol) server for seamless LLM integration.
+Start Islands as an MCP (Model Context Protocol) server for seamless LLM integration.
 
 ## Usage
 
 ```bash
 # Start stdio server (default, for Claude Code)
-pythia serve
+islands serve
 
 # Start HTTP server for remote access
-pythia serve --transport http --port 8080
+islands serve --transport http --port 8080
 
 # Specify host for network access
-pythia serve --transport http --host 0.0.0.0 --port 8080
+islands serve --transport http --host 0.0.0.0 --port 8080
 ```
 
 ## Parameters
@@ -76,8 +76,8 @@ Add to your Claude Code MCP configuration:
 ```json
 {
   "mcpServers": {
-    "pythia": {
-      "command": "pythia",
+    "islands": {
+      "command": "islands",
       "args": ["serve"]
     }
   }
@@ -89,9 +89,9 @@ Or with specific data directory:
 ```json
 {
   "mcpServers": {
-    "pythia": {
-      "command": "pythia",
-      "args": ["serve", "--config", "/path/to/pythia.toml"]
+    "islands": {
+      "command": "islands",
+      "args": ["serve", "--config", "/path/to/islands.toml"]
     }
   }
 }
@@ -102,7 +102,7 @@ Or with specific data directory:
 For remote or containerized deployments:
 
 ```bash
-pythia serve --transport http --host 0.0.0.0 --port 8080
+islands serve --transport http --host 0.0.0.0 --port 8080
 ```
 
 Access via HTTP SSE at `http://localhost:8080`.
@@ -110,7 +110,7 @@ Access via HTTP SSE at `http://localhost:8080`.
 ## Docker Usage
 
 ```bash
-docker run -v /path/to/data:/data ghcr.io/jon/pythia:latest serve
+docker run -v /path/to/data:/data ghcr.io/jon/islands:latest serve
 ```
 
 ## Kubernetes
@@ -118,7 +118,7 @@ docker run -v /path/to/data:/data ghcr.io/jon/pythia:latest serve
 Deploy using the Helm chart:
 
 ```bash
-helm install pythia ./deployments/helm/pythia
+helm install islands ./deployments/helm/islands
 ```
 
 ## Tips

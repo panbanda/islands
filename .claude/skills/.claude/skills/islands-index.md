@@ -1,15 +1,15 @@
 ---
-name: pythia-index
-description: Index codebases for semantic search with Pythia
-invocation: pythia index
+name: islands-index
+description: Index codebases for semantic search with Islands
+invocation: islands index
 triggers:
   - index codebase
   - index repository
-  - add to pythia
+  - add to islands
   - index project
 ---
 
-# Pythia Index Skill
+# Islands Index Skill
 
 Index local directories or Git repositories for semantic search.
 
@@ -17,19 +17,19 @@ Index local directories or Git repositories for semantic search.
 
 ```bash
 # Index current directory
-pythia index .
+islands index .
 
 # Index with custom name
-pythia index --name myproject ./src
+islands index --name myproject ./src
 
 # Index multiple directories
-pythia index ./frontend ./backend ./shared
+islands index ./frontend ./backend ./shared
 
 # Index from Git URL
-pythia index --git https://github.com/user/repo
+islands index --git https://github.com/user/repo
 
 # Force re-index
-pythia index --force --name myproject .
+islands index --force --name myproject .
 ```
 
 ## Parameters
@@ -73,19 +73,19 @@ Source files indexed by default:
 
 ### Index a Monorepo
 ```bash
-pythia index --name monorepo-frontend ./packages/frontend
-pythia index --name monorepo-backend ./packages/backend
-pythia index --name monorepo-shared ./packages/shared
+islands index --name monorepo-frontend ./packages/frontend
+islands index --name monorepo-backend ./packages/backend
+islands index --name monorepo-shared ./packages/shared
 ```
 
 ### Index with Custom Filters
 ```bash
-pythia index --include "**/*.go,**/*.proto" --exclude "**/testdata/**" .
+islands index --include "**/*.go,**/*.proto" --exclude "**/testdata/**" .
 ```
 
 ### Index from GitHub
 ```bash
-pythia index --git https://github.com/kubernetes/kubernetes
+islands index --git https://github.com/kubernetes/kubernetes
 ```
 
 ## Output
@@ -105,4 +105,4 @@ Indexed 42 files (156 KB) in 2.3s
 - Use `--name` to give meaningful names for multiple indexes
 - Use `--force` to update an existing index after code changes
 - Index only relevant directories to improve search quality
-- Check indexed files with `pythia list`
+- Check indexed files with `islands list`
