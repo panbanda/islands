@@ -1,0 +1,45 @@
+Thank you for installing {{ .Chart.Name }}!
+
+Your release is named {{ .Release.Name }}.
+
+To learn more about the release, try:
+
+  $ helm status {{ .Release.Name }}
+  $ helm get all {{ .Release.Name }}
+
+{{- if .Values.ingress.enabled }}
+
+Islands is exposed via Ingress at:
+{{- range .Values.ingress.hosts }}
+  - http{{ if $.Values.ingress.tls }}s{{ end }}://{{ .host }}
+{{- end }}
+
+{{- else }}
+
+To access Islands locally, run:
+
+  $ kubectl port-forward svc/{{ include "islands.fullname" . }} 8080:{{ .Values.service.mcpPort }} -n {{ .Release.Namespace }}
+
+Then access the MCP server at http://localhost:8080
+
+{{- end }}
+
+{{- if .Values.cronJob.enabled }}
+
+A CronJob is configured to sync repositories every {{ .Values.cronJob.schedule }}.
+
+{{- end }}
+
+{{- if not .Values.secrets.openaiApiKey }}
+
+WARNING: No OpenAI API key configured. Set secrets.openaiApiKey in your values.
+
+{{- end }}
+
+{{- if and (not .Values.secrets.github.token) (not .Values.secrets.gitlab.token) }}
+
+WARNING: No git provider tokens configured. Set secrets.github.token or secrets.gitlab.token.
+
+{{- end }}
+
+For more information, visit: https://github.com/panbanda/islands
