@@ -100,9 +100,9 @@ Islands includes a Model Context Protocol (MCP) server that exposes semantic sea
 </details>
 
 <details>
-<summary><strong>OpenAI Agent</strong> - Interactive Q&A sessions</summary>
+<summary><strong>Interactive Agent</strong> - Q&A sessions via OpenAI-compatible APIs</summary>
 
-Islands includes an OpenAI-powered agent for interactive exploration of your codebases. The agent uses function calling to search, retrieve, and explain code.
+Islands includes an agent for interactive exploration of your codebases, compatible with any OpenAI SDK-supported API (OpenAI, Azure OpenAI, local models, etc.). The agent uses function calling to search, retrieve, and explain code.
 
 ```bash
 # Start an interactive session
@@ -204,7 +204,7 @@ islands list
 # Start the MCP server for AI assistant integration
 islands serve
 
-# Interactive Q&A session (requires OpenAI API key)
+# Interactive Q&A session (requires OpenAI-compatible API)
 islands ask
 ```
 
@@ -282,7 +282,7 @@ islands-cli (binary)
     │   │   ├── islands-core (LEANN/HNSW/PQ)
     │   │   └── islands-providers (GitHub/GitLab/Bitbucket/Gitea)
     │   └── islands-core
-    ├── islands-agent (OpenAI integration)
+    ├── islands-agent (OpenAI-compatible agent)
     │   └── islands-core
     └── islands-indexer
 ```
@@ -295,7 +295,7 @@ islands-cli (binary)
 | `islands-providers` | Git provider implementations (GitHub, GitLab, Bitbucket, Gitea) |
 | `islands-indexer` | Code chunking, embedding generation, file watching |
 | `islands-mcp` | MCP server for AI assistant integration |
-| `islands-agent` | OpenAI agent for interactive Q&A |
+| `islands-agent` | Interactive agent for Q&A (OpenAI-compatible) |
 | `islands-cli` | Command-line interface |
 
 ### Core Algorithms
