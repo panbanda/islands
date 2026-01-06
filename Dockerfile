@@ -2,7 +2,7 @@
 # Multi-stage build for optimized Rust binary container
 
 # Build stage
-FROM rust:1.92-bookworm AS builder
+FROM rust:1.85-bookworm AS builder
 
 WORKDIR /build
 
@@ -14,37 +14,23 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     cmake \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy workspace manifests first for dependency caching
-COPY Cargo.toml ./
-COPY crates/islands-core/Cargo.toml crates/islands-core/
-COPY crates/islands-providers/Cargo.toml crates/islands-providers/
-COPY crates/islands-indexer/Cargo.toml crates/islands-indexer/
-COPY crates/islands-mcp/Cargo.toml crates/islands-mcp/
-COPY crates/islands-cli/Cargo.toml crates/islands-cli/
-COPY crates/islands-agent/Cargo.toml crates/islands-agent/
+# Copy manifests first for dependency caching
+COPY Cargo.toml Cargo.lock ./
 
 # Create dummy source files to build dependencies
-RUN mkdir -p crates/islands-core/src \
-    && echo "pub fn lib() {}" > crates/islands-core/src/lib.rs \
-    && mkdir -p crates/islands-providers/src \
-    && echo "pub fn lib() {}" > crates/islands-providers/src/lib.rs \
-    && mkdir -p crates/islands-indexer/src \
-    && echo "pub fn lib() {}" > crates/islands-indexer/src/lib.rs \
-    && mkdir -p crates/islands-mcp/src \
-    && echo "pub fn lib() {}" > crates/islands-mcp/src/lib.rs \
-    && mkdir -p crates/islands-cli/src \
-    && echo "fn main() {}" > crates/islands-cli/src/main.rs \
-    && mkdir -p crates/islands-agent/src \
-    && echo "pub fn lib() {}" > crates/islands-agent/src/lib.rs
+RUN mkdir -p src && \
+    echo "fn main() {}" > src/main.rs && \
+    echo "pub fn lib() {}" > src/lib.rs
 
 # Build dependencies only (cached layer)
-RUN cargo build --release --workspace 2>/dev/null || true
+RUN cargo build --release 2>/dev/null || true
 
 # Copy actual source code
-COPY crates/ crates/
+COPY src/ src/
+COPY benches/ benches/
 
 # Touch source files to invalidate cache and rebuild with real code
-RUN find crates -name "*.rs" -exec touch {} \;
+RUN touch src/main.rs src/lib.rs
 
 # Build the release binary
 RUN cargo build --release --bin islands
@@ -54,7 +40,7 @@ FROM debian:bookworm-slim
 
 LABEL org.opencontainers.image.title="Islands"
 LABEL org.opencontainers.image.description="Codebase Indexing and Inquiry System using LEANN"
-LABEL org.opencontainers.image.version="0.3.0"
+LABEL org.opencontainers.image.version="1.0.0"
 LABEL org.opencontainers.image.source="https://github.com/panbanda/islands"
 
 WORKDIR /app
@@ -91,7 +77,7 @@ USER islands
 
 # Default command runs the MCP server
 ENTRYPOINT ["islands"]
-CMD ["mcp", "serve"]
+CMD ["mcp"]
 
 # Expose MCP and webhook ports
 EXPOSE 8080 9000

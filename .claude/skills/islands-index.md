@@ -1,108 +1,60 @@
 ---
 name: islands-index
-description: Index codebases for semantic search with Islands
-invocation: islands index
+description: Add and index repositories for semantic search
+invocation: islands add
 triggers:
-  - index codebase
-  - index repository
-  - add to islands
-  - index project
+  - index a repository
+  - add codebase to islands
+  - make repo searchable
 ---
 
-# Islands Index Skill
+# When to Use This Skill
 
-Index local directories or Git repositories for semantic search.
+Use `islands add` when:
+- User wants to search a new repository
+- Need to make code searchable for context gathering
+- Setting up Islands for a project
 
-## Usage
+## Quick Reference
 
 ```bash
-# Index current directory
-islands index .
+# Add repository by URL
+islands add github.com/owner/repo
 
-# Index with custom name
-islands index --name myproject ./src
-
-# Index multiple directories
-islands index ./frontend ./backend ./shared
-
-# Index from Git URL
-islands index --git https://github.com/user/repo
-
-# Force re-index
-islands index --force --name myproject .
+# With authentication for private repos
+islands add github.com/owner/repo --token $GITHUB_TOKEN
 ```
 
-## Parameters
+## What Gets Indexed
 
-| Parameter | Short | Description | Default |
-|-----------|-------|-------------|---------|
-| --name | -n | Custom index name | directory name |
-| --git | | Treat path as Git URL | false |
-| --exclude | | Glob patterns to exclude | (see defaults) |
-| --include | | Glob patterns to include | source files |
-| --force | | Force re-indexing | false |
-| --timeout | | Indexing timeout | 30m |
+Source files are chunked and embedded for semantic search:
+- Code files (go, py, js, ts, rs, java, etc.)
+- Config files (yaml, json, toml)
+- Documentation (md)
 
-## Default Exclusions
+Automatically excluded:
+- `node_modules/`, `vendor/`, `.git/`
+- Build artifacts, lock files, minified code
 
-The following are excluded by default:
-- `node_modules/`
-- `.git/`
-- `vendor/`
-- `__pycache__/`
-- `dist/`, `build/`
-- `*.min.js`, `*.min.css`
-- Lock files (package-lock.json, yarn.lock, go.sum)
+## After Indexing
 
-## Default Inclusions
+The repository becomes searchable via:
+- `islands search "query"` - CLI search
+- `islands_search` MCP tool - When running as MCP server
 
-Source files indexed by default:
-- Go: `*.go`
-- Python: `*.py`
-- JavaScript/TypeScript: `*.js`, `*.ts`, `*.jsx`, `*.tsx`
-- Java: `*.java`
-- Rust: `*.rs`
-- C/C++: `*.c`, `*.cpp`, `*.h`, `*.hpp`
-- Ruby: `*.rb`
-- PHP: `*.php`
-- C#: `*.cs`
-- Markdown: `*.md`
-- Config: `*.yaml`, `*.yml`, `*.json`, `*.toml`
+## Sync Updates
 
-## Examples
+To update an existing index after code changes:
 
-### Index a Monorepo
 ```bash
-islands index --name monorepo-frontend ./packages/frontend
-islands index --name monorepo-backend ./packages/backend
-islands index --name monorepo-shared ./packages/shared
+islands sync github/owner/repo
 ```
 
-### Index with Custom Filters
+## Private Repositories
+
+Set token via environment or flag:
+
 ```bash
-islands index --include "**/*.go,**/*.proto" --exclude "**/testdata/**" .
+export ISLANDS_GIT_TOKEN=ghp_xxxxx
+islands add github.com/owner/private-repo
 ```
-
-### Index from GitHub
-```bash
-islands index --git https://github.com/kubernetes/kubernetes
-```
-
-## Output
-
-Shows progress and statistics:
-
-```
-Indexing ./src as 'myproject'...
-  cmd/main.go
-  internal/server/server.go
-  internal/handler/handler.go
-Indexed 42 files (156 KB) in 2.3s
-```
-
-## Tips
-
-- Use `--name` to give meaningful names for multiple indexes
-- Use `--force` to update an existing index after code changes
-- Index only relevant directories to improve search quality
-- Check indexed files with `islands list`

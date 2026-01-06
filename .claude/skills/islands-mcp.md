@@ -1,129 +1,71 @@
 ---
 name: islands-mcp
-description: Start Islands MCP server for LLM integration
-invocation: islands serve
+description: Start Islands as an MCP server for AI assistant integration
+invocation: islands mcp
 triggers:
   - start mcp server
   - islands server
   - mcp integration
-  - llm server
 ---
 
-# Islands MCP Server Skill
+# When to Use This Skill
 
-Start Islands as an MCP (Model Context Protocol) server for seamless LLM integration.
+Use `islands mcp` when:
+- Configuring Islands as an MCP server for Claude
+- Setting up semantic search as an AI tool
+- Deploying Islands for AI assistant access
 
-## Usage
+## Quick Reference
 
 ```bash
-# Start stdio server (default, for Claude Code)
-islands serve
-
-# Start HTTP server for remote access
-islands serve --transport http --port 8080
-
-# Specify host for network access
-islands serve --transport http --host 0.0.0.0 --port 8080
+# Start MCP server (stdio transport)
+islands mcp
 ```
 
-## Parameters
+The server communicates via stdin/stdout using JSON-RPC.
 
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| --transport | Transport mode (stdio, http) | stdio |
-| --port | HTTP port | 8080 |
-| --host | HTTP host | 127.0.0.1 |
+## MCP Tools Exposed
 
-## MCP Tools Available
+When running as MCP server, these tools become available:
 
-### search
-Search indexed codebases using semantic search.
+| Tool | Purpose |
+|------|---------|
+| `islands_search` | Semantic search across indexed codebases |
+| `islands_list` | List available indexed repositories |
+| `islands_add_repo` | Add and index a new repository |
+| `islands_sync` | Update an existing index |
+| `islands_status` | System status and statistics |
 
-```json
-{
-  "query": "authentication middleware",
-  "index": "myproject",
-  "limit": 10
-}
+## Claude Code Setup
+
+```bash
+claude mcp add islands -- islands mcp
 ```
 
-### ask
-Ask questions about the codebase.
+## Claude Desktop Setup
 
-```json
-{
-  "question": "How is user authentication implemented?",
-  "index": "myproject"
-}
-```
-
-### list_indexes
-List all indexed codebases.
-
-### get_index
-Get information about a specific index.
-
-```json
-{
-  "name": "myproject"
-}
-```
-
-## Claude Code Integration
-
-Add to your Claude Code MCP configuration:
+Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
 ```json
 {
   "mcpServers": {
     "islands": {
       "command": "islands",
-      "args": ["serve"]
+      "args": ["mcp"]
     }
   }
 }
 ```
 
-Or with specific data directory:
+## Prerequisites
 
-```json
-{
-  "mcpServers": {
-    "islands": {
-      "command": "islands",
-      "args": ["serve", "--config", "/path/to/islands.toml"]
-    }
-  }
-}
-```
+1. Index repositories first: `islands add <url>`
+2. Verify with: `islands list`
+3. Then start server: `islands mcp`
 
-## HTTP Server
+## How It Helps
 
-For remote or containerized deployments:
-
-```bash
-islands serve --transport http --host 0.0.0.0 --port 8080
-```
-
-Access via HTTP SSE at `http://localhost:8080`.
-
-## Docker Usage
-
-```bash
-docker run -v /path/to/data:/data ghcr.io/jon/islands:latest serve
-```
-
-## Kubernetes
-
-Deploy using the Helm chart:
-
-```bash
-helm install islands ./deployments/helm/islands
-```
-
-## Tips
-
-- Use stdio transport for local Claude Code integration
-- Use HTTP transport for remote or shared access
-- Index codebases before starting the server
-- Check server health with the version command
+Once configured, the AI assistant can:
+- Search across all indexed codebases semantically
+- Find implementations and patterns without manual file navigation
+- Gather context from multiple repositories simultaneously

@@ -1,14 +1,9 @@
 {
   "packages": {
     ".": {
-      "release-type": "simple",
+      "release-type": "rust",
       "component": "islands",
       "extra-files": [
-        {
-          "type": "toml",
-          "path": "Cargo.toml",
-          "jsonpath": "$.workspace.package.version"
-        },
         {
           "type": "yaml",
           "path": "charts/islands/Chart.yaml",
@@ -20,10 +15,6 @@
           "jsonpath": "$.appVersion"
         }
       ]
-    },
-    ".claude/skills": {
-      "release-type": "simple",
-      "component": "islands-skills"
     }
   }
 }
