@@ -5,19 +5,27 @@
 //!
 //! # Features
 //!
-//! When the `embeddings` feature is enabled, this module also provides
-//! `EmbedderProvider` for computing embeddings using various models via
-//! the `embed_anything` crate.
+//! - `embeddings`: Uses `embed_anything` for flexible model support (Candle, ONNX, Cloud)
+//! - `embeddings-candle`: Native Candle ML framework inference with GPU acceleration
+//!
+//! The `embeddings-candle` feature provides native Candle ML framework inference,
+//! supporting GPU acceleration via Metal (macOS) or CUDA (NVIDIA).
 
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "embeddings")]
 mod provider;
 
+#[cfg(feature = "embeddings-candle")]
+mod candle_provider;
+
 #[cfg(feature = "embeddings")]
 pub use provider::{
     CloudProvider, EmbedderConfig, EmbedderProvider, InferenceBackend, ModelArchitecture,
 };
+
+#[cfg(feature = "embeddings-candle")]
+pub use candle_provider::{CandleDevice, CandleEmbedder, CandleEmbedderConfig, CandleModel};
 
 /// A dense embedding vector
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
