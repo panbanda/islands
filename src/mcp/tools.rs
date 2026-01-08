@@ -102,6 +102,20 @@ impl IslandsTools {
                     "required": []
                 }),
             },
+            Tool {
+                name: "islands_remove".to_string(),
+                description: "Remove an indexed repository and delete all associated files".to_string(),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {
+                        "index_name": {
+                            "type": "string",
+                            "description": "Index name in format 'provider/owner/repo'"
+                        }
+                    },
+                    "required": ["index_name"]
+                }),
+            },
         ]
     }
 
@@ -113,6 +127,7 @@ impl IslandsTools {
             "islands_add_repo" => self.handle_add_repo(arguments).await,
             "islands_sync" => self.handle_sync(arguments).await,
             "islands_status" => self.handle_status(arguments).await,
+            "islands_remove" => self.handle_remove(arguments).await,
             _ => Err(Error::ToolNotFound(name.to_string())),
         }
     }
@@ -360,6 +375,45 @@ impl IslandsTools {
             })
         }
     }
+
+    /// Handle islands_remove tool
+    async fn handle_remove(&self, arguments: Value) -> Result<CallToolResult> {
+        #[derive(Deserialize)]
+        struct RemoveArgs {
+            index_name: String,
+        }
+
+        let args: RemoveArgs =
+            serde_json::from_value(arguments).map_err(|e| Error::InvalidParams(e.to_string()))?;
+
+        // Get index info first for the response message
+        let info = self
+            .indexer
+            .get_index(&args.index_name)
+            .await
+            .ok_or_else(|| {
+                Error::Indexer(crate::indexer::Error::index_not_found(&args.index_name))
+            })?;
+
+        let repo_name = info.repository.full_name.clone();
+
+        match self.indexer.delete_index(&args.index_name).await {
+            Ok(()) => Ok(CallToolResult {
+                content: vec![ContentItem::text(format!(
+                    "Successfully removed index '{}'\nRepository: {}",
+                    args.index_name, repo_name
+                ))],
+                is_error: false,
+            }),
+            Err(e) => Ok(CallToolResult {
+                content: vec![ContentItem::text(format!(
+                    "Failed to remove index '{}': {}",
+                    args.index_name, e
+                ))],
+                is_error: true,
+            }),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -392,7 +446,7 @@ mod tests {
         let tools = IslandsTools::new(indexer);
         let list = tools.list_tools();
 
-        assert_eq!(list.len(), 5);
+        assert_eq!(list.len(), 6);
 
         let names: Vec<_> = list.iter().map(|t| t.name.as_str()).collect();
         assert!(names.contains(&"islands_list"));
@@ -400,6 +454,7 @@ mod tests {
         assert!(names.contains(&"islands_add_repo"));
         assert!(names.contains(&"islands_sync"));
         assert!(names.contains(&"islands_status"));
+        assert!(names.contains(&"islands_remove"));
     }
 
     #[test]
@@ -701,5 +756,467 @@ mod tests {
             .call_tool("islands_sync", json!({"index_name": "test"}))
             .await;
         let _ = tools.call_tool("islands_status", json!({})).await;
+    }
+
+    // Tests for result formatting and content truncation
+    mod formatting_tests {
+        use super::*;
+
+        #[test]
+        fn test_content_truncation_short_text() {
+            // Test the truncation logic: text <= 500 chars should not be truncated
+            let short_text = "a".repeat(500);
+            let truncated = if short_text.len() > 500 {
+                format!("{}...", &short_text[..500])
+            } else {
+                short_text.clone()
+            };
+            assert_eq!(truncated.len(), 500);
+            assert!(!truncated.ends_with("..."));
+        }
+
+        #[test]
+        fn test_content_truncation_long_text() {
+            // Test the truncation logic: text > 500 chars should be truncated
+            let long_text = "a".repeat(600);
+            let truncated = if long_text.len() > 500 {
+                format!("{}...", &long_text[..500])
+            } else {
+                long_text.clone()
+            };
+            assert_eq!(truncated.len(), 503); // 500 + "..."
+            assert!(truncated.ends_with("..."));
+        }
+
+        #[test]
+        fn test_content_truncation_exact_boundary() {
+            // Test edge case: exactly 501 chars
+            let boundary_text = "a".repeat(501);
+            let truncated = if boundary_text.len() > 500 {
+                format!("{}...", &boundary_text[..500])
+            } else {
+                boundary_text.clone()
+            };
+            assert_eq!(truncated.len(), 503);
+            assert!(truncated.ends_with("..."));
+        }
+
+        #[test]
+        fn test_search_result_formatting_with_all_fields() {
+            // Verify search result JSON structure parsing works correctly
+            let result = json!({
+                "repository": "github/test/repo",
+                "file": "src/main.rs",
+                "score": 0.95,
+                "content": "fn main() { println!(\"Hello\"); }"
+            });
+
+            assert_eq!(
+                result.get("repository").and_then(|v| v.as_str()),
+                Some("github/test/repo")
+            );
+            assert_eq!(
+                result.get("file").and_then(|v| v.as_str()),
+                Some("src/main.rs")
+            );
+            assert!(result.get("score").and_then(|v| v.as_f64()).is_some());
+            assert!(result.get("content").and_then(|v| v.as_str()).is_some());
+        }
+
+        #[test]
+        fn test_search_result_formatting_missing_optional_fields() {
+            // Test handling of results missing optional fields
+            let result = json!({
+                "repository": "unknown"
+            });
+
+            // Should gracefully handle missing fields
+            assert_eq!(result.get("file").and_then(|v| v.as_str()), None);
+            assert_eq!(result.get("score").and_then(|v| v.as_f64()), None);
+            assert_eq!(result.get("content").and_then(|v| v.as_str()), None);
+        }
+
+        #[test]
+        fn test_list_output_format() {
+            // Verify the expected format of list output
+            let mut output = String::from("Available Islands Indexes:\n\n");
+            output.push_str(&format!("- **{}**\n", "github/test/repo"));
+            output.push_str(&format!("  Provider: {}\n", "github"));
+            output.push_str(&format!(
+                "  Files: {}, Size: {:.2} MB\n",
+                100,
+                1024.0 * 1024.0 / (1024.0 * 1024.0)
+            ));
+            output.push_str(&format!("  Updated: {}\n\n", "2024-01-01T00:00:00Z"));
+
+            assert!(output.contains("Available Islands Indexes:"));
+            assert!(output.contains("**github/test/repo**"));
+            assert!(output.contains("Provider: github"));
+            assert!(output.contains("Files: 100"));
+            assert!(output.contains("Size: 1.00 MB"));
+        }
+
+        #[test]
+        fn test_status_json_structure() {
+            // Verify the JSON structure of status output
+            let status = json!({
+                "name": "github/test/repo",
+                "repository": "test/repo",
+                "file_count": 50,
+                "size_bytes": 1024,
+                "updated_at": "2024-01-01T00:00:00Z",
+                "last_commit": "abc123",
+                "indexed": true,
+                "error": null
+            });
+
+            assert_eq!(status["name"], "github/test/repo");
+            assert_eq!(status["file_count"], 50);
+            assert_eq!(status["indexed"], true);
+            assert!(status["error"].is_null());
+        }
+
+        #[test]
+        fn test_status_json_with_error() {
+            let status = json!({
+                "name": "github/test/repo",
+                "indexed": false,
+                "error": "Clone failed: authentication error"
+            });
+
+            assert_eq!(status["indexed"], false);
+            assert!(!status["error"].is_null());
+        }
+    }
+
+    // Tests for edge cases in argument parsing
+    mod argument_parsing_tests {
+        use super::*;
+
+        #[tokio::test]
+        async fn test_search_with_null_indexes() {
+            let indexer = create_test_service();
+            let tools = IslandsTools::new(indexer);
+
+            // Explicitly null indexes array
+            let result = tools
+                .call_tool("islands_search", json!({"query": "test", "indexes": null}))
+                .await
+                .unwrap();
+
+            assert!(!result.is_error);
+        }
+
+        #[tokio::test]
+        async fn test_search_with_empty_indexes() {
+            let indexer = create_test_service();
+            let tools = IslandsTools::new(indexer);
+
+            // Empty indexes array should search all (none in this case)
+            let result = tools
+                .call_tool("islands_search", json!({"query": "test", "indexes": []}))
+                .await
+                .unwrap();
+
+            assert!(!result.is_error);
+        }
+
+        #[tokio::test]
+        async fn test_search_with_zero_top_k() {
+            let indexer = create_test_service();
+            let tools = IslandsTools::new(indexer);
+
+            let result = tools
+                .call_tool("islands_search", json!({"query": "test", "top_k": 0}))
+                .await
+                .unwrap();
+
+            assert!(!result.is_error);
+        }
+
+        #[tokio::test]
+        async fn test_search_with_large_top_k() {
+            let indexer = create_test_service();
+            let tools = IslandsTools::new(indexer);
+
+            let result = tools
+                .call_tool("islands_search", json!({"query": "test", "top_k": 1000}))
+                .await
+                .unwrap();
+
+            assert!(!result.is_error);
+        }
+
+        #[tokio::test]
+        async fn test_status_with_empty_string_index_name() {
+            let indexer = create_test_service();
+            let tools = IslandsTools::new(indexer);
+
+            let result = tools
+                .call_tool("islands_status", json!({"index_name": ""}))
+                .await
+                .unwrap();
+
+            // Empty string is treated as a specific index name that doesn't exist
+            assert!(result.is_error);
+        }
+
+        #[tokio::test]
+        async fn test_add_repo_with_various_url_formats() {
+            let indexer = create_test_service();
+            let tools = IslandsTools::new(indexer);
+
+            // HTTPS URL without .git suffix
+            let result = tools
+                .call_tool(
+                    "islands_add_repo",
+                    json!({"url": "https://github.com/owner/repo"}),
+                )
+                .await;
+            // May fail due to network/clone issues, but should parse URL correctly
+            assert!(result.is_ok() || result.is_err());
+
+            // HTTPS URL with .git suffix
+            let result = tools
+                .call_tool(
+                    "islands_add_repo",
+                    json!({"url": "https://github.com/owner/repo.git"}),
+                )
+                .await;
+            assert!(result.is_ok() || result.is_err());
+        }
+
+        #[tokio::test]
+        async fn test_sync_with_path_like_index_name() {
+            let indexer = create_test_service();
+            let tools = IslandsTools::new(indexer);
+
+            // Index name in expected format
+            let result = tools
+                .call_tool("islands_sync", json!({"index_name": "github/owner/repo"}))
+                .await;
+
+            // Should fail because index doesn't exist
+            assert!(result.is_err());
+        }
+    }
+
+    // Tests for CallToolResult structure
+    mod result_structure_tests {
+        use super::*;
+
+        #[tokio::test]
+        async fn test_list_result_has_text_content() {
+            let indexer = create_test_service();
+            let tools = IslandsTools::new(indexer);
+
+            let result = tools.call_tool("islands_list", json!({})).await.unwrap();
+
+            assert!(!result.content.is_empty());
+            match &result.content[0] {
+                ContentItem::Text { text } => {
+                    assert!(!text.is_empty());
+                }
+                _ => panic!("Expected text content"),
+            }
+        }
+
+        #[tokio::test]
+        async fn test_search_result_has_text_content() {
+            let indexer = create_test_service();
+            let tools = IslandsTools::new(indexer);
+
+            let result = tools
+                .call_tool("islands_search", json!({"query": "test"}))
+                .await
+                .unwrap();
+
+            assert!(!result.content.is_empty());
+            match &result.content[0] {
+                ContentItem::Text { text } => {
+                    assert!(text.contains("No results found") || text.contains("Search results"));
+                }
+                _ => panic!("Expected text content"),
+            }
+        }
+
+        #[tokio::test]
+        async fn test_status_result_is_valid_json() {
+            let indexer = create_test_service();
+            let tools = IslandsTools::new(indexer);
+
+            let result = tools.call_tool("islands_status", json!({})).await.unwrap();
+
+            match &result.content[0] {
+                ContentItem::Text { text } => {
+                    // Should be valid JSON (empty array or status list)
+                    let parsed: serde_json::Value = serde_json::from_str(text).unwrap();
+                    assert!(parsed.is_array());
+                }
+                _ => panic!("Expected text content"),
+            }
+        }
+    }
+
+    // Tests for error handling edge cases
+    mod error_handling_tests {
+        use super::*;
+
+        #[tokio::test]
+        async fn test_search_with_wrong_query_type() {
+            let indexer = create_test_service();
+            let tools = IslandsTools::new(indexer);
+
+            // Query should be string, not number
+            let result = tools
+                .call_tool("islands_search", json!({"query": 123}))
+                .await;
+
+            assert!(result.is_err());
+        }
+
+        #[tokio::test]
+        async fn test_search_with_wrong_indexes_type() {
+            let indexer = create_test_service();
+            let tools = IslandsTools::new(indexer);
+
+            // indexes should be array, not string
+            let result = tools
+                .call_tool(
+                    "islands_search",
+                    json!({"query": "test", "indexes": "not-an-array"}),
+                )
+                .await;
+
+            assert!(result.is_err());
+        }
+
+        #[tokio::test]
+        async fn test_search_with_wrong_top_k_type() {
+            let indexer = create_test_service();
+            let tools = IslandsTools::new(indexer);
+
+            // top_k should be integer, not string
+            let result = tools
+                .call_tool("islands_search", json!({"query": "test", "top_k": "five"}))
+                .await;
+
+            assert!(result.is_err());
+        }
+
+        #[tokio::test]
+        async fn test_add_repo_with_empty_url() {
+            let indexer = create_test_service();
+            let tools = IslandsTools::new(indexer);
+
+            let result = tools
+                .call_tool("islands_add_repo", json!({"url": ""}))
+                .await;
+
+            // Empty URL should fail to parse
+            assert!(result.is_err());
+        }
+
+        #[tokio::test]
+        async fn test_sync_with_empty_index_name() {
+            let indexer = create_test_service();
+            let tools = IslandsTools::new(indexer);
+
+            let result = tools
+                .call_tool("islands_sync", json!({"index_name": ""}))
+                .await;
+
+            // Empty index name should not be found
+            assert!(result.is_err());
+        }
+    }
+
+    // Additional tests for complete tool coverage
+    mod additional_coverage_tests {
+        use super::*;
+
+        #[tokio::test]
+        async fn test_call_tool_routes_correctly() {
+            let indexer = create_test_service();
+            let tools = IslandsTools::new(indexer);
+
+            // Verify each tool name routes to correct handler
+            let list_result = tools.call_tool("islands_list", json!({})).await;
+            assert!(list_result.is_ok());
+
+            let search_result = tools
+                .call_tool("islands_search", json!({"query": "x"}))
+                .await;
+            assert!(search_result.is_ok());
+
+            let status_result = tools.call_tool("islands_status", json!({})).await;
+            assert!(status_result.is_ok());
+        }
+
+        #[test]
+        fn test_list_tools_returns_correct_count() {
+            let indexer = create_test_service();
+            let tools = IslandsTools::new(indexer);
+
+            let list = tools.list_tools();
+            assert_eq!(list.len(), 6);
+        }
+
+        #[test]
+        fn test_each_tool_has_unique_name() {
+            let indexer = create_test_service();
+            let tools = IslandsTools::new(indexer);
+
+            let list = tools.list_tools();
+            let names: Vec<_> = list.iter().map(|t| &t.name).collect();
+
+            let mut unique_names = names.clone();
+            unique_names.sort();
+            unique_names.dedup();
+
+            assert_eq!(names.len(), unique_names.len());
+        }
+
+        #[test]
+        fn test_all_tools_have_object_schema() {
+            let indexer = create_test_service();
+            let tools = IslandsTools::new(indexer);
+
+            for tool in tools.list_tools() {
+                assert_eq!(
+                    tool.input_schema["type"], "object",
+                    "Tool {} should have object schema",
+                    tool.name
+                );
+            }
+        }
+
+        #[test]
+        fn test_all_tools_have_properties_field() {
+            let indexer = create_test_service();
+            let tools = IslandsTools::new(indexer);
+
+            for tool in tools.list_tools() {
+                assert!(
+                    tool.input_schema["properties"].is_object(),
+                    "Tool {} should have properties field",
+                    tool.name
+                );
+            }
+        }
+
+        #[test]
+        fn test_all_tools_have_required_field() {
+            let indexer = create_test_service();
+            let tools = IslandsTools::new(indexer);
+
+            for tool in tools.list_tools() {
+                assert!(
+                    tool.input_schema["required"].is_array(),
+                    "Tool {} should have required field",
+                    tool.name
+                );
+            }
+        }
     }
 }

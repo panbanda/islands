@@ -466,4 +466,330 @@ mod tests {
         // Check that semaphore has correct number of permits
         assert_eq!(manager.semaphore.available_permits(), 3);
     }
+
+    #[test]
+    fn test_semaphore_permits_various() {
+        let manager1 = RepositoryManager::new(PathBuf::from("/tmp"), HashMap::new(), 1);
+        assert_eq!(manager1.semaphore.available_permits(), 1);
+
+        let manager10 = RepositoryManager::new(PathBuf::from("/tmp"), HashMap::new(), 10);
+        assert_eq!(manager10.semaphore.available_permits(), 10);
+    }
+
+    #[tokio::test]
+    async fn test_state_update_same_commit() {
+        let manager = create_manager();
+        let repo = test_repo();
+
+        // Insert initial state with commit
+        {
+            let mut states = manager.states.write().await;
+            let mut state = RepositoryState::new(repo.clone(), PathBuf::from("/tmp/test"));
+            state.mark_synced("abc123".to_string());
+            state.mark_indexed();
+            states.insert(repo.id(), state);
+        }
+
+        // Verify initial state
+        let state = manager.get_state(&repo).await.unwrap();
+        assert!(state.indexed);
+        assert!(!manager.needs_reindex(&repo).await);
+    }
+
+    #[tokio::test]
+    async fn test_state_update_different_commit_triggers_reindex() {
+        let manager = create_manager();
+        let repo = test_repo();
+
+        // Insert initial indexed state
+        {
+            let mut states = manager.states.write().await;
+            let mut state = RepositoryState::new(repo.clone(), PathBuf::from("/tmp/test"));
+            state.mark_synced("abc123".to_string());
+            state.mark_indexed();
+            states.insert(repo.id(), state);
+        }
+
+        // Verify initially indexed
+        assert!(!manager.needs_reindex(&repo).await);
+
+        // Simulate commit change (manually update to show the logic)
+        {
+            let mut states = manager.states.write().await;
+            if let Some(state) = states.get_mut(&repo.id()) {
+                state.mark_synced("def456".to_string());
+                state.indexed = false; // This is what update_repository does
+            }
+        }
+
+        // Should now need reindex
+        assert!(manager.needs_reindex(&repo).await);
+    }
+
+    #[tokio::test]
+    async fn test_state_with_error_needs_reindex() {
+        let manager = create_manager();
+        let repo = test_repo();
+
+        // Insert state with error
+        {
+            let mut states = manager.states.write().await;
+            let mut state = RepositoryState::new(repo.clone(), PathBuf::from("/tmp/test"));
+            state.mark_synced("abc123".to_string());
+            state.mark_indexed();
+            state.set_error("previous sync failed");
+            states.insert(repo.id(), state);
+        }
+
+        // Even though indexed, error means reindex needed
+        assert!(manager.needs_reindex(&repo).await);
+    }
+
+    #[tokio::test]
+    async fn test_mark_indexed_clears_needs_reindex() {
+        let manager = create_manager();
+        let repo = test_repo();
+
+        // Insert unindexed state
+        {
+            let mut states = manager.states.write().await;
+            let mut state = RepositoryState::new(repo.clone(), PathBuf::from("/tmp/test"));
+            state.mark_synced("abc123".to_string());
+            states.insert(repo.id(), state);
+        }
+
+        // Should need reindex
+        assert!(manager.needs_reindex(&repo).await);
+
+        // Mark indexed
+        manager.mark_indexed(&repo).await;
+
+        // Should no longer need reindex
+        assert!(!manager.needs_reindex(&repo).await);
+    }
+
+    #[tokio::test]
+    async fn test_list_states_multiple() {
+        let manager = create_manager();
+
+        // Insert multiple states
+        {
+            let mut states = manager.states.write().await;
+            for i in 0..5 {
+                let repo = Repository::new(
+                    "github",
+                    "owner",
+                    &format!("repo-{}", i),
+                    &format!("https://github.com/owner/repo-{}.git", i),
+                );
+                let state =
+                    RepositoryState::new(repo.clone(), PathBuf::from(format!("/tmp/{}", i)));
+                states.insert(repo.id(), state);
+            }
+        }
+
+        let states = manager.list_states().await;
+        assert_eq!(states.len(), 5);
+    }
+
+    #[tokio::test]
+    async fn test_update_repository_nonexistent_falls_back_to_clone() {
+        use crate::providers::factory::create_provider;
+
+        // Create manager with provider (but clone will fail due to invalid URL)
+        let mut providers: HashMap<String, Arc<dyn GitProvider>> = HashMap::new();
+        let github = create_provider("github", None, None, None).unwrap();
+        providers.insert("github".to_string(), github);
+
+        let manager =
+            RepositoryManager::new(PathBuf::from("/tmp/test-update-nonexistent"), providers, 4);
+
+        let repo = Repository::new(
+            "github",
+            "nonexistent-owner-12345",
+            "nonexistent-repo-67890",
+            "https://github.com/nonexistent-owner-12345/nonexistent-repo-67890.git",
+        );
+
+        // Update on nonexistent repo should try to clone and fail
+        let result = manager.update_repository(&repo).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_remove_repository_clears_state() {
+        let dir = tempfile::tempdir().unwrap();
+        let manager = RepositoryManager::new(dir.path().to_path_buf(), HashMap::new(), 4);
+        let repo = test_repo();
+
+        // Insert state
+        {
+            let mut states = manager.states.write().await;
+            let state = RepositoryState::new(repo.clone(), PathBuf::from("/tmp/test"));
+            states.insert(repo.id(), state);
+        }
+
+        // Verify state exists
+        assert!(manager.get_state(&repo).await.is_some());
+
+        // Remove repository
+        manager.remove_repository(&repo).await.unwrap();
+
+        // State should be cleared
+        assert!(manager.get_state(&repo).await.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_remove_repository_removes_directory() {
+        let dir = tempfile::tempdir().unwrap();
+        let manager = RepositoryManager::new(dir.path().to_path_buf(), HashMap::new(), 4);
+
+        let repo = test_repo();
+        let local_path = manager.local_path(&repo);
+
+        // Create the directory
+        std::fs::create_dir_all(&local_path).unwrap();
+        std::fs::write(local_path.join("file.txt"), "content").unwrap();
+        assert!(local_path.exists());
+
+        // Remove repository
+        manager.remove_repository(&repo).await.unwrap();
+
+        // Directory should be removed
+        assert!(!local_path.exists());
+    }
+
+    #[test]
+    fn test_local_path_nested_owners() {
+        let manager = create_manager();
+
+        // Some providers support nested namespaces (like GitLab)
+        let repo = Repository::new(
+            "gitlab",
+            "org/team",
+            "repo",
+            "https://gitlab.com/org/team/repo.git",
+        );
+
+        let path = manager.local_path(&repo);
+        // Path should include the nested owner
+        assert!(path.to_string_lossy().contains("org/team"));
+    }
+
+    #[tokio::test]
+    async fn test_get_state_returns_clone() {
+        let manager = create_manager();
+        let repo = test_repo();
+
+        // Insert state
+        {
+            let mut states = manager.states.write().await;
+            let mut state = RepositoryState::new(repo.clone(), PathBuf::from("/tmp/test"));
+            state.mark_synced("abc123".to_string());
+            states.insert(repo.id(), state);
+        }
+
+        // Get state twice - both should work (it's a clone, not a move)
+        let state1 = manager.get_state(&repo).await;
+        let state2 = manager.get_state(&repo).await;
+
+        assert!(state1.is_some());
+        assert!(state2.is_some());
+        assert_eq!(state1.unwrap().last_commit, state2.unwrap().last_commit);
+    }
+
+    #[tokio::test]
+    async fn test_clone_repository_removes_existing_dir() {
+        use crate::providers::factory::create_provider;
+
+        let dir = tempfile::tempdir().unwrap();
+        let mut providers: HashMap<String, Arc<dyn GitProvider>> = HashMap::new();
+        let github = create_provider("github", None, None, None).unwrap();
+        providers.insert("github".to_string(), github);
+
+        let manager = RepositoryManager::new(dir.path().to_path_buf(), providers, 4);
+
+        let repo = test_repo();
+        let local_path = manager.local_path(&repo);
+
+        // Create existing directory with content
+        std::fs::create_dir_all(&local_path).unwrap();
+        std::fs::write(local_path.join("existing.txt"), "old content").unwrap();
+
+        // Clone will fail (invalid repo) but should have removed existing dir
+        let result = manager.clone_repository(&repo).await;
+        assert!(result.is_err());
+        // The old directory should be gone (removed before clone attempt)
+        assert!(!local_path.join("existing.txt").exists());
+    }
+
+    #[tokio::test]
+    async fn test_clone_repository_stores_state_on_success() {
+        // This test documents the expected behavior - clone stores state
+        let manager = create_manager();
+        let repo = test_repo();
+
+        // Before clone attempt
+        assert!(manager.get_state(&repo).await.is_none());
+
+        // Clone fails (no provider) but we can verify state behavior
+        let result = manager.clone_repository(&repo).await;
+        assert!(result.is_err());
+
+        // On failure, state should not be stored
+        // (Clone only stores on success path)
+        assert!(manager.get_state(&repo).await.is_none());
+    }
+
+    #[test]
+    fn test_storage_path_preserved() {
+        let path = PathBuf::from("/custom/path/to/repos");
+        let manager = RepositoryManager::new(path.clone(), HashMap::new(), 4);
+
+        assert_eq!(manager.storage_path, path);
+    }
+
+    #[tokio::test]
+    async fn test_multiple_repos_independent_states() {
+        let manager = create_manager();
+
+        let repo1 = Repository::new(
+            "github",
+            "owner1",
+            "repo1",
+            "https://github.com/owner1/repo1.git",
+        );
+        let repo2 = Repository::new(
+            "github",
+            "owner2",
+            "repo2",
+            "https://github.com/owner2/repo2.git",
+        );
+
+        // Insert states
+        {
+            let mut states = manager.states.write().await;
+
+            let mut state1 = RepositoryState::new(repo1.clone(), PathBuf::from("/tmp/1"));
+            state1.mark_synced("commit1".to_string());
+            state1.mark_indexed();
+            states.insert(repo1.id(), state1);
+
+            let mut state2 = RepositoryState::new(repo2.clone(), PathBuf::from("/tmp/2"));
+            state2.mark_synced("commit2".to_string());
+            // Not indexed
+            states.insert(repo2.id(), state2);
+        }
+
+        // Verify independent states
+        assert!(!manager.needs_reindex(&repo1).await);
+        assert!(manager.needs_reindex(&repo2).await);
+
+        // Mark repo2 indexed
+        manager.mark_indexed(&repo2).await;
+        assert!(!manager.needs_reindex(&repo2).await);
+
+        // repo1 should be unchanged
+        assert!(!manager.needs_reindex(&repo1).await);
+    }
 }

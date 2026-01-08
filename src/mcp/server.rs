@@ -516,4 +516,562 @@ mod tests {
 
         assert_eq!(response.jsonrpc, "2.0");
     }
+
+    // Tests for unusual request IDs
+    mod request_id_tests {
+        use super::*;
+
+        #[tokio::test]
+        async fn test_handle_request_with_null_id() {
+            let mut server = create_test_server();
+
+            let request = Request {
+                jsonrpc: "2.0".to_string(),
+                id: Value::Null,
+                method: "tools/list".to_string(),
+                params: json!({}),
+            };
+
+            let response = server.handle_request(request).await;
+
+            assert_eq!(response.id, Value::Null);
+            assert!(response.result.is_some());
+        }
+
+        #[tokio::test]
+        async fn test_handle_request_with_numeric_id() {
+            let mut server = create_test_server();
+
+            let request = Request {
+                jsonrpc: "2.0".to_string(),
+                id: json!(42),
+                method: "tools/list".to_string(),
+                params: json!({}),
+            };
+
+            let response = server.handle_request(request).await;
+
+            assert_eq!(response.id, json!(42));
+        }
+
+        #[tokio::test]
+        async fn test_handle_request_with_string_id() {
+            let mut server = create_test_server();
+
+            let request = Request {
+                jsonrpc: "2.0".to_string(),
+                id: json!("request-abc-123"),
+                method: "tools/list".to_string(),
+                params: json!({}),
+            };
+
+            let response = server.handle_request(request).await;
+
+            assert_eq!(response.id, json!("request-abc-123"));
+        }
+
+        #[tokio::test]
+        async fn test_handle_request_with_negative_id() {
+            let mut server = create_test_server();
+
+            let request = Request {
+                jsonrpc: "2.0".to_string(),
+                id: json!(-1),
+                method: "tools/list".to_string(),
+                params: json!({}),
+            };
+
+            let response = server.handle_request(request).await;
+
+            assert_eq!(response.id, json!(-1));
+        }
+
+        #[tokio::test]
+        async fn test_handle_request_with_float_id() {
+            let mut server = create_test_server();
+
+            let request = Request {
+                jsonrpc: "2.0".to_string(),
+                id: json!(1.23456789),
+                method: "tools/list".to_string(),
+                params: json!({}),
+            };
+
+            let response = server.handle_request(request).await;
+
+            assert_eq!(response.id, json!(1.23456789));
+        }
+
+        #[tokio::test]
+        async fn test_handle_request_with_large_id() {
+            let mut server = create_test_server();
+
+            let request = Request {
+                jsonrpc: "2.0".to_string(),
+                id: json!(9_007_199_254_740_991_i64), // Max safe integer in JS
+                method: "tools/list".to_string(),
+                params: json!({}),
+            };
+
+            let response = server.handle_request(request).await;
+
+            assert_eq!(response.id, json!(9_007_199_254_740_991_i64));
+        }
+
+        #[tokio::test]
+        async fn test_error_response_preserves_id() {
+            let mut server = create_test_server();
+
+            let request = Request {
+                jsonrpc: "2.0".to_string(),
+                id: json!("error-test-id"),
+                method: "nonexistent/method".to_string(),
+                params: json!({}),
+            };
+
+            let response = server.handle_request(request).await;
+
+            assert_eq!(response.id, json!("error-test-id"));
+            assert!(response.error.is_some());
+        }
+    }
+
+    // Tests for initialization behavior
+    mod initialization_tests {
+        use super::*;
+
+        #[tokio::test]
+        async fn test_multiple_initialize_calls() {
+            let mut server = create_test_server();
+
+            // First initialization
+            let request1 = Request {
+                jsonrpc: "2.0".to_string(),
+                id: json!(1),
+                method: "initialize".to_string(),
+                params: json!({}),
+            };
+            let response1 = server.handle_request(request1).await;
+            assert!(server.initialized);
+            assert!(response1.result.is_some());
+
+            // Second initialization (should still work)
+            let request2 = Request {
+                jsonrpc: "2.0".to_string(),
+                id: json!(2),
+                method: "initialize".to_string(),
+                params: json!({}),
+            };
+            let response2 = server.handle_request(request2).await;
+            assert!(server.initialized);
+            assert!(response2.result.is_some());
+
+            // Verify both responses have the same structure
+            let result1 = response1.result.unwrap();
+            let result2 = response2.result.unwrap();
+            assert_eq!(
+                result1.get("protocolVersion"),
+                result2.get("protocolVersion")
+            );
+        }
+
+        #[tokio::test]
+        async fn test_initialize_with_params() {
+            let mut server = create_test_server();
+
+            // Initialize with client info (params are currently ignored but should not error)
+            let request = Request {
+                jsonrpc: "2.0".to_string(),
+                id: json!(1),
+                method: "initialize".to_string(),
+                params: json!({
+                    "protocolVersion": "2024-11-05",
+                    "capabilities": {},
+                    "clientInfo": {
+                        "name": "test-client",
+                        "version": "1.0.0"
+                    }
+                }),
+            };
+
+            let response = server.handle_request(request).await;
+
+            assert!(server.initialized);
+            assert!(response.result.is_some());
+        }
+
+        #[tokio::test]
+        async fn test_tools_list_before_initialize() {
+            let mut server = create_test_server();
+            assert!(!server.initialized);
+
+            let request = Request {
+                jsonrpc: "2.0".to_string(),
+                id: json!(1),
+                method: "tools/list".to_string(),
+                params: json!({}),
+            };
+
+            // Should still work (server doesn't enforce initialization order)
+            let response = server.handle_request(request).await;
+            assert!(response.result.is_some());
+        }
+
+        #[tokio::test]
+        async fn test_tools_call_before_initialize() {
+            let mut server = create_test_server();
+            assert!(!server.initialized);
+
+            let request = Request {
+                jsonrpc: "2.0".to_string(),
+                id: json!(1),
+                method: "tools/call".to_string(),
+                params: json!({
+                    "name": "islands_list",
+                    "arguments": {}
+                }),
+            };
+
+            // Should still work
+            let response = server.handle_request(request).await;
+            assert!(response.result.is_some());
+        }
+    }
+
+    // Tests for method handling edge cases
+    mod method_handling_tests {
+        use super::*;
+
+        #[tokio::test]
+        async fn test_handle_empty_method() {
+            let mut server = create_test_server();
+
+            let request = Request {
+                jsonrpc: "2.0".to_string(),
+                id: json!(1),
+                method: String::new(),
+                params: json!({}),
+            };
+
+            let response = server.handle_request(request).await;
+
+            assert!(response.error.is_some());
+            assert_eq!(
+                response.error.as_ref().unwrap().code,
+                Error::METHOD_NOT_FOUND
+            );
+        }
+
+        #[tokio::test]
+        async fn test_handle_method_with_whitespace() {
+            let mut server = create_test_server();
+
+            let request = Request {
+                jsonrpc: "2.0".to_string(),
+                id: json!(1),
+                method: " tools/list ".to_string(),
+                params: json!({}),
+            };
+
+            let response = server.handle_request(request).await;
+
+            // Method names are matched exactly, so whitespace means not found
+            assert!(response.error.is_some());
+            assert_eq!(
+                response.error.as_ref().unwrap().code,
+                Error::METHOD_NOT_FOUND
+            );
+        }
+
+        #[tokio::test]
+        async fn test_handle_case_sensitive_method() {
+            let mut server = create_test_server();
+
+            let request = Request {
+                jsonrpc: "2.0".to_string(),
+                id: json!(1),
+                method: "TOOLS/LIST".to_string(),
+                params: json!({}),
+            };
+
+            let response = server.handle_request(request).await;
+
+            // Methods are case sensitive
+            assert!(response.error.is_some());
+            assert_eq!(
+                response.error.as_ref().unwrap().code,
+                Error::METHOD_NOT_FOUND
+            );
+        }
+
+        #[tokio::test]
+        async fn test_shutdown_response() {
+            let mut server = create_test_server();
+
+            let request = Request {
+                jsonrpc: "2.0".to_string(),
+                id: json!(1),
+                method: "shutdown".to_string(),
+                params: json!({}),
+            };
+
+            let response = server.handle_request(request).await;
+
+            assert!(response.result.is_some());
+            assert_eq!(response.result.unwrap(), Value::Null);
+        }
+
+        #[tokio::test]
+        async fn test_initialized_notification() {
+            let mut server = create_test_server();
+
+            let request = Request {
+                jsonrpc: "2.0".to_string(),
+                id: json!(1),
+                method: "initialized".to_string(),
+                params: json!({}),
+            };
+
+            let response = server.handle_request(request).await;
+
+            assert!(response.result.is_some());
+            assert_eq!(response.result.unwrap(), Value::Null);
+        }
+    }
+
+    // Tests for tools/call error handling
+    mod tools_call_tests {
+        use super::*;
+
+        #[tokio::test]
+        async fn test_tools_call_missing_name() {
+            let mut server = create_test_server();
+
+            let request = Request {
+                jsonrpc: "2.0".to_string(),
+                id: json!(1),
+                method: "tools/call".to_string(),
+                params: json!({
+                    "arguments": {}
+                }),
+            };
+
+            let response = server.handle_request(request).await;
+
+            assert!(response.error.is_some());
+            assert_eq!(response.error.as_ref().unwrap().code, Error::INVALID_PARAMS);
+        }
+
+        #[tokio::test]
+        async fn test_tools_call_with_array_params() {
+            let mut server = create_test_server();
+
+            let request = Request {
+                jsonrpc: "2.0".to_string(),
+                id: json!(1),
+                method: "tools/call".to_string(),
+                params: json!(["not", "valid"]),
+            };
+
+            let response = server.handle_request(request).await;
+
+            // Serde deserializes arrays positionally: first element -> name, second -> arguments
+            // So this is actually a valid request for tool named "not" (which doesn't exist)
+            // The response will have is_error=true in the result, not in response.error
+            assert!(response.result.is_some());
+            let result = response.result.unwrap();
+            assert_eq!(result.get("is_error").unwrap(), true);
+        }
+
+        #[tokio::test]
+        async fn test_tools_call_with_null_params() {
+            let mut server = create_test_server();
+
+            let request = Request {
+                jsonrpc: "2.0".to_string(),
+                id: json!(1),
+                method: "tools/call".to_string(),
+                params: Value::Null,
+            };
+
+            let response = server.handle_request(request).await;
+
+            assert!(response.error.is_some());
+            assert_eq!(response.error.as_ref().unwrap().code, Error::INVALID_PARAMS);
+        }
+
+        #[tokio::test]
+        async fn test_tools_call_with_empty_arguments() {
+            let mut server = create_test_server();
+
+            let request = Request {
+                jsonrpc: "2.0".to_string(),
+                id: json!(1),
+                method: "tools/call".to_string(),
+                params: json!({
+                    "name": "islands_list"
+                    // arguments not provided, should default to null
+                }),
+            };
+
+            let response = server.handle_request(request).await;
+
+            // Should succeed - islands_list doesn't require arguments
+            assert!(response.result.is_some());
+        }
+
+        #[tokio::test]
+        async fn test_tools_call_unknown_tool_error_format() {
+            let mut server = create_test_server();
+
+            let request = Request {
+                jsonrpc: "2.0".to_string(),
+                id: json!(1),
+                method: "tools/call".to_string(),
+                params: json!({
+                    "name": "nonexistent_tool",
+                    "arguments": {}
+                }),
+            };
+
+            let response = server.handle_request(request).await;
+
+            // Unknown tool returns success with is_error=true in result
+            assert!(response.result.is_some());
+            let result = response.result.unwrap();
+            assert_eq!(result.get("is_error").unwrap(), true);
+
+            let content = result.get("content").unwrap().as_array().unwrap();
+            assert!(!content.is_empty());
+        }
+    }
+
+    // Tests for response structure
+    mod response_structure_tests {
+        use super::*;
+
+        #[tokio::test]
+        async fn test_success_response_has_no_error() {
+            let mut server = create_test_server();
+
+            let request = Request {
+                jsonrpc: "2.0".to_string(),
+                id: json!(1),
+                method: "tools/list".to_string(),
+                params: json!({}),
+            };
+
+            let response = server.handle_request(request).await;
+
+            assert!(response.result.is_some());
+            assert!(response.error.is_none());
+        }
+
+        #[tokio::test]
+        async fn test_error_response_has_no_result() {
+            let mut server = create_test_server();
+
+            let request = Request {
+                jsonrpc: "2.0".to_string(),
+                id: json!(1),
+                method: "nonexistent".to_string(),
+                params: json!({}),
+            };
+
+            let response = server.handle_request(request).await;
+
+            assert!(response.result.is_none());
+            assert!(response.error.is_some());
+        }
+
+        #[tokio::test]
+        async fn test_response_serialization() {
+            let mut server = create_test_server();
+
+            let request = Request {
+                jsonrpc: "2.0".to_string(),
+                id: json!(1),
+                method: "tools/list".to_string(),
+                params: json!({}),
+            };
+
+            let response = server.handle_request(request).await;
+
+            // Should serialize to valid JSON
+            let json_str = serde_json::to_string(&response).unwrap();
+            assert!(json_str.contains("jsonrpc"));
+            assert!(json_str.contains("2.0"));
+            assert!(json_str.contains("result"));
+        }
+
+        #[tokio::test]
+        async fn test_initialize_response_structure() {
+            let mut server = create_test_server();
+
+            let response = server.handle_initialize(json!(1), json!({})).await;
+
+            let result = response.result.unwrap();
+
+            // Check required fields exist
+            assert!(result.get("protocolVersion").is_some());
+            assert!(result.get("capabilities").is_some());
+            assert!(result.get("serverInfo").is_some());
+
+            // Check server info
+            let info = result.get("serverInfo").unwrap();
+            assert_eq!(info.get("name").unwrap(), "islands");
+            assert!(info.get("version").is_some());
+        }
+
+        #[tokio::test]
+        async fn test_tools_list_response_structure() {
+            let server = create_test_server();
+
+            let response = server.handle_tools_list(json!(1)).await;
+
+            let result = response.result.unwrap();
+            let tools = result.get("tools").unwrap().as_array().unwrap();
+
+            // Should have exactly 6 tools
+            assert_eq!(tools.len(), 6);
+
+            // Each tool should have required fields
+            for tool in tools {
+                assert!(tool.get("name").is_some());
+                assert!(tool.get("description").is_some());
+                assert!(tool.get("inputSchema").is_some());
+            }
+        }
+    }
+
+    // Tests for server construction
+    mod construction_tests {
+        use super::*;
+        use tempfile::tempdir;
+
+        #[test]
+        fn test_server_new_with_custom_config() {
+            let dir = tempdir().unwrap();
+            let config = IndexerConfig {
+                repos_path: dir.path().join("repos"),
+                indexes_path: dir.path().join("indexes"),
+                ..Default::default()
+            };
+            let indexer = Arc::new(IndexerService::new(config, HashMap::new()));
+            let server = McpServer::new(indexer);
+
+            assert!(!server.initialized);
+        }
+
+        #[test]
+        fn test_run_server_function_compiles() {
+            // Just verify the public API exists and compiles
+            #[allow(clippy::type_complexity)]
+            let _: fn(
+                Arc<IndexerService>,
+            )
+                -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>> + Send>> =
+                |indexer| Box::pin(async move { run_server(indexer).await });
+        }
+    }
 }

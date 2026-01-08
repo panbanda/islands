@@ -665,4 +665,301 @@ mod tests {
         let result = provider.parse_webhook(&headers, body).await.unwrap();
         assert!(result.is_none());
     }
+
+    mod http_mock_tests {
+        use super::*;
+        use futures::StreamExt;
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        async fn create_provider_with_mock(mock_server: &MockServer) -> GiteaProvider {
+            // Gitea provider appends /api/v1 automatically
+            GiteaProvider::with_base_url(mock_server.uri(), Some("test-token".to_string()))
+                .unwrap()
+        }
+
+        #[tokio::test]
+        async fn test_get_repository_success() {
+            let mock_server = MockServer::start().await;
+
+            Mock::given(method("GET"))
+                .and(path("/api/v1/repos/owner/repo"))
+                .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                    "name": "repo",
+                    "full_name": "owner/repo",
+                    "clone_url": "https://gitea.example.com/owner/repo.git",
+                    "ssh_url": "git@gitea.example.com:owner/repo.git",
+                    "default_branch": "main",
+                    "description": "Test repository",
+                    "language": "Rust",
+                    "size": 1024,
+                    "updated_at": "2024-01-15T10:30:00Z",
+                    "private": false,
+                    "topics": ["rust", "testing"],
+                    "owner": {
+                        "login": "owner"
+                    }
+                })))
+                .mount(&mock_server)
+                .await;
+
+            let provider = create_provider_with_mock(&mock_server).await;
+            let result = provider.get_repository("owner", "repo").await;
+
+            assert!(result.is_ok());
+            let repo = result.unwrap();
+            assert_eq!(repo.name, "repo");
+            assert_eq!(repo.owner, "owner");
+            assert_eq!(repo.default_branch, "main");
+            assert_eq!(repo.language, Some("Rust".to_string()));
+        }
+
+        #[tokio::test]
+        async fn test_get_repository_not_found() {
+            let mock_server = MockServer::start().await;
+
+            Mock::given(method("GET"))
+                .and(path("/api/v1/repos/owner/nonexistent"))
+                .respond_with(ResponseTemplate::new(404).set_body_json(serde_json::json!({
+                    "message": "GetRepoByName: repository not found"
+                })))
+                .mount(&mock_server)
+                .await;
+
+            let provider = create_provider_with_mock(&mock_server).await;
+            let result = provider.get_repository("owner", "nonexistent").await;
+
+            assert!(result.is_err());
+            assert!(matches!(result.unwrap_err(), ProviderError::NotFound(_)));
+        }
+
+        #[tokio::test]
+        async fn test_get_repository_unauthorized() {
+            let mock_server = MockServer::start().await;
+
+            Mock::given(method("GET"))
+                .and(path("/api/v1/repos/owner/private-repo"))
+                .respond_with(ResponseTemplate::new(401).set_body_json(serde_json::json!({
+                    "message": "token is required"
+                })))
+                .mount(&mock_server)
+                .await;
+
+            let provider = create_provider_with_mock(&mock_server).await;
+            let result = provider.get_repository("owner", "private-repo").await;
+
+            assert!(result.is_err());
+            assert!(matches!(
+                result.unwrap_err(),
+                ProviderError::AuthenticationError(_)
+            ));
+        }
+
+        #[tokio::test]
+        async fn test_get_repository_rate_limited() {
+            let mock_server = MockServer::start().await;
+
+            Mock::given(method("GET"))
+                .and(path("/api/v1/repos/owner/repo"))
+                .respond_with(
+                    ResponseTemplate::new(429)
+                        .insert_header("retry-after", "45")
+                        .set_body_json(serde_json::json!({
+                            "message": "API rate limit exceeded"
+                        })),
+                )
+                .mount(&mock_server)
+                .await;
+
+            let provider = create_provider_with_mock(&mock_server).await;
+            let result = provider.get_repository("owner", "repo").await;
+
+            assert!(result.is_err());
+            match result.unwrap_err() {
+                ProviderError::RateLimitExceeded { retry_after_secs } => {
+                    assert_eq!(retry_after_secs, 45);
+                }
+                e => panic!("Expected RateLimitExceeded, got {:?}", e),
+            }
+        }
+
+        #[tokio::test]
+        async fn test_list_repositories_success() {
+            let mock_server = MockServer::start().await;
+
+            Mock::given(method("GET"))
+                .and(path("/api/v1/user/repos"))
+                .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                    {
+                        "name": "repo1",
+                        "full_name": "owner/repo1",
+                        "clone_url": "https://gitea.example.com/owner/repo1.git",
+                        "default_branch": "main",
+                        "owner": { "login": "owner" }
+                    },
+                    {
+                        "name": "repo2",
+                        "full_name": "owner/repo2",
+                        "clone_url": "https://gitea.example.com/owner/repo2.git",
+                        "default_branch": "main",
+                        "owner": { "login": "owner" }
+                    }
+                ])))
+                .mount(&mock_server)
+                .await;
+
+            let provider = create_provider_with_mock(&mock_server).await;
+            let repos: Vec<_> = provider.list_repositories(None, None, 10).collect().await;
+
+            assert_eq!(repos.len(), 2);
+            assert!(repos[0].is_ok());
+            assert!(repos[1].is_ok());
+            assert_eq!(repos[0].as_ref().unwrap().name, "repo1");
+            assert_eq!(repos[1].as_ref().unwrap().name, "repo2");
+        }
+
+        #[tokio::test]
+        async fn test_list_repositories_empty() {
+            let mock_server = MockServer::start().await;
+
+            Mock::given(method("GET"))
+                .and(path("/api/v1/user/repos"))
+                .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([])))
+                .mount(&mock_server)
+                .await;
+
+            let provider = create_provider_with_mock(&mock_server).await;
+            let repos: Vec<_> = provider.list_repositories(None, None, 10).collect().await;
+
+            assert!(repos.is_empty());
+        }
+
+        #[tokio::test]
+        async fn test_list_repositories_for_org() {
+            let mock_server = MockServer::start().await;
+
+            Mock::given(method("GET"))
+                .and(path("/api/v1/orgs/myorg/repos"))
+                .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                    {
+                        "name": "org-repo",
+                        "full_name": "myorg/org-repo",
+                        "clone_url": "https://gitea.example.com/myorg/org-repo.git",
+                        "default_branch": "main",
+                        "owner": { "login": "myorg" }
+                    }
+                ])))
+                .mount(&mock_server)
+                .await;
+
+            let provider = create_provider_with_mock(&mock_server).await;
+            let repos: Vec<_> = provider
+                .list_repositories(Some("myorg"), None, 10)
+                .collect()
+                .await;
+
+            assert_eq!(repos.len(), 1);
+            assert_eq!(repos[0].as_ref().unwrap().name, "org-repo");
+        }
+
+        #[tokio::test]
+        async fn test_get_latest_commit_success() {
+            let mock_server = MockServer::start().await;
+
+            Mock::given(method("GET"))
+                .and(path("/api/v1/repos/owner/repo/git/commits/main"))
+                .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                    "sha": "abc123def456"
+                })))
+                .mount(&mock_server)
+                .await;
+
+            let provider = create_provider_with_mock(&mock_server).await;
+            let result = provider
+                .get_latest_commit("owner", "repo", Some("main"))
+                .await;
+
+            assert!(result.is_ok());
+            assert_eq!(result.unwrap(), "abc123def456");
+        }
+
+        #[tokio::test]
+        async fn test_get_latest_commit_uses_default_branch() {
+            let mock_server = MockServer::start().await;
+
+            // First call to get repository for default branch
+            Mock::given(method("GET"))
+                .and(path("/api/v1/repos/owner/repo"))
+                .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                    "name": "repo",
+                    "full_name": "owner/repo",
+                    "clone_url": "https://gitea.example.com/owner/repo.git",
+                    "default_branch": "develop",
+                    "owner": { "login": "owner" }
+                })))
+                .mount(&mock_server)
+                .await;
+
+            // Then call to get commit for that branch
+            Mock::given(method("GET"))
+                .and(path("/api/v1/repos/owner/repo/git/commits/develop"))
+                .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                    "sha": "def789"
+                })))
+                .mount(&mock_server)
+                .await;
+
+            let provider = create_provider_with_mock(&mock_server).await;
+            let result = provider.get_latest_commit("owner", "repo", None).await;
+
+            assert!(result.is_ok());
+            assert_eq!(result.unwrap(), "def789");
+        }
+
+        #[tokio::test]
+        async fn test_get_default_branch_success() {
+            let mock_server = MockServer::start().await;
+
+            Mock::given(method("GET"))
+                .and(path("/api/v1/repos/owner/repo"))
+                .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                    "name": "repo",
+                    "full_name": "owner/repo",
+                    "clone_url": "https://gitea.example.com/owner/repo.git",
+                    "default_branch": "develop",
+                    "owner": { "login": "owner" }
+                })))
+                .mount(&mock_server)
+                .await;
+
+            let provider = create_provider_with_mock(&mock_server).await;
+            let result = provider.get_default_branch("owner", "repo").await;
+
+            assert!(result.is_ok());
+            assert_eq!(result.unwrap(), "develop");
+        }
+
+        #[tokio::test]
+        async fn test_list_repositories_unauthorized() {
+            let mock_server = MockServer::start().await;
+
+            Mock::given(method("GET"))
+                .and(path("/api/v1/user/repos"))
+                .respond_with(ResponseTemplate::new(401).set_body_json(serde_json::json!({
+                    "message": "token is required"
+                })))
+                .mount(&mock_server)
+                .await;
+
+            let provider = create_provider_with_mock(&mock_server).await;
+            let repos: Vec<_> = provider.list_repositories(None, None, 10).collect().await;
+
+            assert_eq!(repos.len(), 1);
+            assert!(repos[0].is_err());
+            assert!(matches!(
+                repos[0].as_ref().unwrap_err(),
+                ProviderError::AuthenticationError(_)
+            ));
+        }
+    }
 }
