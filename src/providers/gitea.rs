@@ -674,8 +674,7 @@ mod tests {
 
         async fn create_provider_with_mock(mock_server: &MockServer) -> GiteaProvider {
             // Gitea provider appends /api/v1 automatically
-            GiteaProvider::with_base_url(mock_server.uri(), Some("test-token".to_string()))
-                .unwrap()
+            GiteaProvider::with_base_url(mock_server.uri(), Some("test-token".to_string())).unwrap()
         }
 
         #[tokio::test]

@@ -1069,9 +1069,9 @@ mod tests {
             #[allow(clippy::type_complexity)]
             let _: fn(
                 Arc<IndexerService>,
-            )
-                -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>> + Send>> =
-                |indexer| Box::pin(async move { run_server(indexer).await });
+            ) -> std::pin::Pin<
+                Box<dyn std::future::Future<Output = Result<()>> + Send>,
+            > = |indexer| Box::pin(async move { run_server(indexer).await });
         }
     }
 }
