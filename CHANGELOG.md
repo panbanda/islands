@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/panbanda/islands/compare/islands-v1.0.2...islands-v1.1.0) (2026-01-08)
+
+
+### Features
+
+* comprehensive test coverage and CLI improvements ([822d082](https://github.com/panbanda/islands/commit/822d082fe31fc3bee4c263e14d3fd3a0f6b6a3ee))
+
 ## [1.0.2](https://github.com/panbanda/islands/compare/islands-v1.0.1...islands-v1.0.2) (2026-01-06)
 
 
