@@ -27,12 +27,12 @@
 //! # }
 //! ```
 
-use crate::core::error::{CoreError, CoreResult};
 use crate::Embedding;
+use crate::core::error::{CoreError, CoreResult};
 use candle_core::{DType, Device, Tensor};
 use candle_nn::VarBuilder;
 use candle_transformers::models::bert::{BertModel, Config as BertConfig};
-use hf_hub::{api::tokio::Api, Repo, RepoType};
+use hf_hub::{Repo, RepoType, api::tokio::Api};
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 use tokenizers::Tokenizer;
@@ -135,16 +135,18 @@ impl CandleDevice {
         match self {
             Self::Cpu => Ok(Device::Cpu),
             #[cfg(feature = "candle-metal")]
-            Self::Metal => Device::new_metal(0)
-                .map_err(|e| CoreError::EmbeddingError(format!("Failed to create Metal device: {e}"))),
+            Self::Metal => Device::new_metal(0).map_err(|e| {
+                CoreError::EmbeddingError(format!("Failed to create Metal device: {e}"))
+            }),
             #[cfg(not(feature = "candle-metal"))]
             Self::Metal => {
                 tracing::warn!("Metal not available, falling back to CPU");
                 Ok(Device::Cpu)
             }
             #[cfg(feature = "candle-cuda")]
-            Self::Cuda => Device::new_cuda(0)
-                .map_err(|e| CoreError::EmbeddingError(format!("Failed to create CUDA device: {e}"))),
+            Self::Cuda => Device::new_cuda(0).map_err(|e| {
+                CoreError::EmbeddingError(format!("Failed to create CUDA device: {e}"))
+            }),
             #[cfg(not(feature = "candle-cuda"))]
             Self::Cuda => {
                 tracing::warn!("CUDA not available, falling back to CPU");
@@ -250,20 +252,17 @@ impl CandleEmbedder {
         let repo = api.repo(Repo::new(model_id.clone(), RepoType::Model));
 
         // Download required files
-        let config_path = repo
-            .get("config.json")
-            .await
-            .map_err(|e| CoreError::EmbeddingError(format!("Failed to download config.json: {e}")))?;
+        let config_path = repo.get("config.json").await.map_err(|e| {
+            CoreError::EmbeddingError(format!("Failed to download config.json: {e}"))
+        })?;
 
-        let tokenizer_path = repo
-            .get("tokenizer.json")
-            .await
-            .map_err(|e| CoreError::EmbeddingError(format!("Failed to download tokenizer.json: {e}")))?;
+        let tokenizer_path = repo.get("tokenizer.json").await.map_err(|e| {
+            CoreError::EmbeddingError(format!("Failed to download tokenizer.json: {e}"))
+        })?;
 
-        let weights_path = repo
-            .get("model.safetensors")
-            .await
-            .map_err(|e| CoreError::EmbeddingError(format!("Failed to download model.safetensors: {e}")))?;
+        let weights_path = repo.get("model.safetensors").await.map_err(|e| {
+            CoreError::EmbeddingError(format!("Failed to download model.safetensors: {e}"))
+        })?;
 
         // Load configuration
         let config_content = std::fs::read_to_string(&config_path)
@@ -372,7 +371,11 @@ impl CandleEmbedder {
         let batch_size = encodings.len();
 
         // Find max sequence length in this batch
-        let max_len = encodings.iter().map(|e| e.get_ids().len()).max().unwrap_or(0);
+        let max_len = encodings
+            .iter()
+            .map(|e| e.get_ids().len())
+            .max()
+            .unwrap_or(0);
 
         // Prepare input tensors
         let mut all_input_ids = Vec::with_capacity(batch_size * max_len);
@@ -400,13 +403,27 @@ impl CandleEmbedder {
 
         // Create tensors
         let input_ids = Tensor::from_vec(all_input_ids, (batch_size, max_len), &state.device)
-            .map_err(|e| CoreError::EmbeddingError(format!("Failed to create input_ids tensor: {e}")))?;
+            .map_err(|e| {
+                CoreError::EmbeddingError(format!("Failed to create input_ids tensor: {e}"))
+            })?;
 
-        let token_type_ids = Tensor::from_vec(all_token_type_ids, (batch_size, max_len), &state.device)
-            .map_err(|e| CoreError::EmbeddingError(format!("Failed to create token_type_ids tensor: {e}")))?;
+        let token_type_ids = Tensor::from_vec(
+            all_token_type_ids,
+            (batch_size, max_len),
+            &state.device,
+        )
+        .map_err(|e| {
+            CoreError::EmbeddingError(format!("Failed to create token_type_ids tensor: {e}"))
+        })?;
 
-        let attention_mask = Tensor::from_vec(all_attention_mask.clone(), (batch_size, max_len), &state.device)
-            .map_err(|e| CoreError::EmbeddingError(format!("Failed to create attention_mask tensor: {e}")))?;
+        let attention_mask = Tensor::from_vec(
+            all_attention_mask.clone(),
+            (batch_size, max_len),
+            &state.device,
+        )
+        .map_err(|e| {
+            CoreError::EmbeddingError(format!("Failed to create attention_mask tensor: {e}"))
+        })?;
 
         // Run model forward pass
         let output = state
@@ -416,11 +433,16 @@ impl CandleEmbedder {
 
         // Mean pooling: average over sequence dimension, weighted by attention mask
         let attention_mask_f32 = Tensor::from_vec(
-            all_attention_mask.iter().map(|&x| x as f32).collect::<Vec<f32>>(),
+            all_attention_mask
+                .iter()
+                .map(|&x| x as f32)
+                .collect::<Vec<f32>>(),
             (batch_size, max_len),
             &state.device,
         )
-        .map_err(|e| CoreError::EmbeddingError(format!("Failed to create attention mask f32: {e}")))?;
+        .map_err(|e| {
+            CoreError::EmbeddingError(format!("Failed to create attention mask f32: {e}"))
+        })?;
 
         // Expand attention mask to match hidden size
         let mask_expanded = attention_mask_f32
@@ -526,7 +548,10 @@ mod tests {
             CandleModel::AllMiniLmL6V2.model_id(),
             "sentence-transformers/all-MiniLM-L6-v2"
         );
-        assert_eq!(CandleModel::BgeSmallEnV15.model_id(), "BAAI/bge-small-en-v1.5");
+        assert_eq!(
+            CandleModel::BgeSmallEnV15.model_id(),
+            "BAAI/bge-small-en-v1.5"
+        );
     }
 
     #[test]
