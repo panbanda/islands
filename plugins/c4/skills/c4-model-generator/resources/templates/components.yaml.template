@@ -1,0 +1,9 @@
+# yaml-language-server: $schema=../../../../_schema/c4.schema.json
+components:
+  - id: {{COMPONENT_ID}}
+    name: {{COMPONENT_NAME}}
+    description: {{COMPONENT_DESCRIPTION}}
+    technology: {{TECHNOLOGY}}
+    containerId: {{PARENT_CONTAINER_ID}}
+    tags:
+      - {{COMPONENT_TYPE}}

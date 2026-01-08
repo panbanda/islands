@@ -1,0 +1,10 @@
+# yaml-language-server: $schema=../../../../_schema/c4.schema.json
+containers:
+  - id: {{CONTAINER_ID}}
+    name: {{CONTAINER_NAME}}
+    description: {{CONTAINER_DESCRIPTION}}
+    technology: {{TECHNOLOGY_STACK}}
+    tags:
+      - {{CONTAINER_TYPE}}  # api | database | queue | cache | worker | cli
+    properties:
+      port: {{PORT}}

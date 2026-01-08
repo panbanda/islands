@@ -1,0 +1,10 @@
+# yaml-language-server: $schema=../../../../_schema/c4.schema.json
+systems:
+  - id: {{SYSTEM_ID}}
+    name: {{SYSTEM_NAME}}
+    description: {{SYSTEM_DESCRIPTION}}
+    tags:
+      - core
+    properties:
+      team: {{TEAM_NAME}}
+      repository: {{REPOSITORY_URL}}

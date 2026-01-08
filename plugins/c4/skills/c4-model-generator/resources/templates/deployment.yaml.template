@@ -1,0 +1,21 @@
+# yaml-language-server: $schema=../../_schema/c4.schema.json
+deployments:
+  - id: {{DEPLOYMENT_ID}}
+    name: {{DEPLOYMENT_NAME}}
+    description: {{DEPLOYMENT_DESCRIPTION}}
+    nodes:
+      - id: {{NODE_ID}}
+        name: {{NODE_NAME}}
+        technology: {{INFRASTRUCTURE_TECHNOLOGY}}
+        properties:
+          region: {{REGION}}
+        children:
+          - id: {{CHILD_NODE_ID}}
+            name: {{CHILD_NODE_NAME}}
+            technology: {{CHILD_TECHNOLOGY}}
+            instances:
+              - container: {{SYSTEM_ID}}.{{CONTAINER_ID}}
+                replicas: {{REPLICA_COUNT}}
+                properties:
+                  cpu: {{CPU}}
+                  memory: {{MEMORY}}

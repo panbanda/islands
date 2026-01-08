@@ -1,0 +1,15 @@
+# yaml-language-server: $schema=../../_schema/mod.schema.json
+version: "1.0"
+name: {{PROJECT_NAME}}
+
+include:
+  - shared/*.yaml
+  - systems/**/system.yaml
+  - systems/**/containers.yaml
+  - systems/**/components.yaml
+  - systems/**/relationships.yaml
+  - flows/*.yaml
+  - deployments/*.yaml
+
+options:
+  showMinimap: true

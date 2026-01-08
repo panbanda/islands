@@ -1,0 +1,23 @@
+{
+  "name": "c4",
+  "version": "0.1.0",
+  "author": {
+    "name": "Panbanda",
+    "url": "https://github.com/panbanda"
+  },
+  "homepage": "https://github.com/panbanda/islands",
+  "description": "Generate C4 architecture model YAML by systematically analyzing codebases. Creates or updates a c4-model/ workspace with schema-compliant YAML.",
+  "keywords": [
+    "c4",
+    "architecture",
+    "documentation",
+    "diagrams",
+    "yaml"
+  ],
+  "skills": [
+    "skills/c4-model-generator"
+  ],
+  "commands": [
+    "commands/c4.md"
+  ]
+}

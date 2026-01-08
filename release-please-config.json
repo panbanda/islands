@@ -15,6 +15,28 @@
           "jsonpath": "$.appVersion"
         }
       ]
+    },
+    ".claude-plugin": {
+      "release-type": "simple",
+      "component": "islands-marketplace",
+      "extra-files": [
+        {
+          "type": "json",
+          "path": "marketplace.json",
+          "jsonpath": "$.metadata.version"
+        }
+      ]
+    },
+    "plugins/c4": {
+      "release-type": "simple",
+      "component": "c4-plugin",
+      "extra-files": [
+        {
+          "type": "json",
+          "path": "plugin.json",
+          "jsonpath": "$.version"
+        }
+      ]
     }
   }
 }

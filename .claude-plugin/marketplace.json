@@ -1,0 +1,19 @@
+{
+  "name": "islands",
+  "owner": {
+    "name": "Panbanda"
+  },
+  "metadata": {
+    "description": "Claude Code plugins for Islands - LEANN-based codebase indexing with semantic search",
+    "version": "0.1.0",
+    "homepage": "https://github.com/panbanda/islands",
+    "repository": "https://github.com/panbanda/islands"
+  },
+  "plugins": [
+    {
+      "name": "c4",
+      "source": "./plugins/c4",
+      "description": "Generate C4 architecture model YAML by analyzing codebases"
+    }
+  ]
+}

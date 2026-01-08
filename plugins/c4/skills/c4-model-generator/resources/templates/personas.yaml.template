@@ -1,0 +1,9 @@
+# yaml-language-server: $schema=../../_schema/c4.schema.json
+persons:
+  - id: {{PERSONA_ID}}
+    name: {{PERSONA_NAME}}
+    description: {{PERSONA_DESCRIPTION}}
+    tags:
+      - {{PERSONA_TYPE}}  # external | internal
+    properties:
+      segment: {{SEGMENT}}

@@ -1,0 +1,13 @@
+# yaml-language-server: $schema=../../_schema/c4.schema.json
+flows:
+  - id: {{FLOW_ID}}
+    name: {{FLOW_NAME}}
+    description: {{FLOW_DESCRIPTION}}
+    tags:
+      - {{FLOW_TYPE}}  # critical-path | user-facing | background
+    steps:
+      - seq: 1
+        from: {{STEP1_FROM}}
+        to: {{STEP1_TO}}
+        description: {{STEP1_DESCRIPTION}}
+        technology: {{STEP1_TECHNOLOGY}}

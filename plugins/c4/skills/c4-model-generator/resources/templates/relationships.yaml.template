@@ -1,0 +1,8 @@
+# yaml-language-server: $schema=../../../../_schema/c4.schema.json
+relationships:
+  - from: {{SOURCE_ELEMENT}}
+    to: {{TARGET_ELEMENT}}
+    description: {{RELATIONSHIP_DESCRIPTION}}
+    technology: {{PROTOCOL_OR_MECHANISM}}
+    tags:
+      - {{RELATIONSHIP_TYPE}}  # sync | async | external
