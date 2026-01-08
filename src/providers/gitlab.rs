@@ -620,4 +620,307 @@ mod tests {
         let url = provider.get_clone_url(&repo);
         assert_eq!(url, "https://oauth2:my-token@gitlab.com/test/repo.git");
     }
+
+    mod http_mock_tests {
+        use super::*;
+        use futures::StreamExt;
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        async fn create_provider_with_mock(mock_server: &MockServer) -> GitLabProvider {
+            // GitLab provider appends /api/v4 automatically, so we use the base URI
+            let base_url = mock_server.uri();
+            GitLabProvider::with_base_url(&base_url, Some("test-token".to_string())).unwrap()
+        }
+
+        #[tokio::test]
+        async fn test_get_repository_success() {
+            let mock_server = MockServer::start().await;
+
+            Mock::given(method("GET"))
+                .and(path("/api/v4/projects/owner%2Frepo"))
+                .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                    "path": "repo",
+                    "path_with_namespace": "owner/repo",
+                    "http_url_to_repo": "https://gitlab.com/owner/repo.git",
+                    "ssh_url_to_repo": "git@gitlab.com:owner/repo.git",
+                    "default_branch": "main",
+                    "description": "Test repository",
+                    "last_activity_at": "2024-01-15T10:30:00Z",
+                    "visibility": "public",
+                    "topics": ["rust", "testing"],
+                    "namespace": {
+                        "path": "owner",
+                        "full_path": "owner"
+                    },
+                    "statistics": {
+                        "repository_size": 1048576
+                    }
+                })))
+                .mount(&mock_server)
+                .await;
+
+            let provider = create_provider_with_mock(&mock_server).await;
+            let result = provider.get_repository("owner", "repo").await;
+
+            assert!(result.is_ok());
+            let repo = result.unwrap();
+            assert_eq!(repo.name, "repo");
+            assert_eq!(repo.owner, "owner");
+            assert_eq!(repo.default_branch, "main");
+            assert!(!repo.is_private);
+        }
+
+        #[tokio::test]
+        async fn test_get_repository_not_found() {
+            let mock_server = MockServer::start().await;
+
+            Mock::given(method("GET"))
+                .and(path("/api/v4/projects/owner%2Fnonexistent"))
+                .respond_with(ResponseTemplate::new(404).set_body_json(serde_json::json!({
+                    "message": "404 Project Not Found"
+                })))
+                .mount(&mock_server)
+                .await;
+
+            let provider = create_provider_with_mock(&mock_server).await;
+            let result = provider.get_repository("owner", "nonexistent").await;
+
+            assert!(result.is_err());
+            assert!(matches!(result.unwrap_err(), ProviderError::NotFound(_)));
+        }
+
+        #[tokio::test]
+        async fn test_get_repository_unauthorized() {
+            let mock_server = MockServer::start().await;
+
+            Mock::given(method("GET"))
+                .and(path("/api/v4/projects/owner%2Fprivate-repo"))
+                .respond_with(ResponseTemplate::new(401).set_body_json(serde_json::json!({
+                    "message": "401 Unauthorized"
+                })))
+                .mount(&mock_server)
+                .await;
+
+            let provider = create_provider_with_mock(&mock_server).await;
+            let result = provider.get_repository("owner", "private-repo").await;
+
+            assert!(result.is_err());
+            assert!(matches!(
+                result.unwrap_err(),
+                ProviderError::AuthenticationError(_)
+            ));
+        }
+
+        #[tokio::test]
+        async fn test_get_repository_rate_limited() {
+            let mock_server = MockServer::start().await;
+
+            Mock::given(method("GET"))
+                .and(path("/api/v4/projects/owner%2Frepo"))
+                .respond_with(
+                    ResponseTemplate::new(429)
+                        .insert_header("retry-after", "120")
+                        .set_body_json(serde_json::json!({
+                            "message": "429 Too Many Requests"
+                        })),
+                )
+                .mount(&mock_server)
+                .await;
+
+            let provider = create_provider_with_mock(&mock_server).await;
+            let result = provider.get_repository("owner", "repo").await;
+
+            assert!(result.is_err());
+            match result.unwrap_err() {
+                ProviderError::RateLimitExceeded { retry_after_secs } => {
+                    assert_eq!(retry_after_secs, 120);
+                }
+                e => panic!("Expected RateLimitExceeded, got {:?}", e),
+            }
+        }
+
+        #[tokio::test]
+        async fn test_list_repositories_success() {
+            let mock_server = MockServer::start().await;
+
+            Mock::given(method("GET"))
+                .and(path("/api/v4/projects"))
+                .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                    {
+                        "path": "repo1",
+                        "path_with_namespace": "owner/repo1",
+                        "http_url_to_repo": "https://gitlab.com/owner/repo1.git",
+                        "default_branch": "main",
+                        "namespace": { "path": "owner" }
+                    },
+                    {
+                        "path": "repo2",
+                        "path_with_namespace": "owner/repo2",
+                        "http_url_to_repo": "https://gitlab.com/owner/repo2.git",
+                        "default_branch": "main",
+                        "namespace": { "path": "owner" }
+                    }
+                ])))
+                .mount(&mock_server)
+                .await;
+
+            let provider = create_provider_with_mock(&mock_server).await;
+            let repos: Vec<_> = provider.list_repositories(None, None, 10).collect().await;
+
+            assert_eq!(repos.len(), 2);
+            assert!(repos[0].is_ok());
+            assert!(repos[1].is_ok());
+            assert_eq!(repos[0].as_ref().unwrap().name, "repo1");
+            assert_eq!(repos[1].as_ref().unwrap().name, "repo2");
+        }
+
+        #[tokio::test]
+        async fn test_list_repositories_empty() {
+            let mock_server = MockServer::start().await;
+
+            Mock::given(method("GET"))
+                .and(path("/api/v4/projects"))
+                .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([])))
+                .mount(&mock_server)
+                .await;
+
+            let provider = create_provider_with_mock(&mock_server).await;
+            let repos: Vec<_> = provider.list_repositories(None, None, 10).collect().await;
+
+            assert!(repos.is_empty());
+        }
+
+        #[tokio::test]
+        async fn test_list_repositories_for_group() {
+            let mock_server = MockServer::start().await;
+
+            Mock::given(method("GET"))
+                .and(path("/api/v4/groups/mygroup/projects"))
+                .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                    {
+                        "path": "group-repo",
+                        "path_with_namespace": "mygroup/group-repo",
+                        "http_url_to_repo": "https://gitlab.com/mygroup/group-repo.git",
+                        "default_branch": "main",
+                        "namespace": { "path": "mygroup" }
+                    }
+                ])))
+                .mount(&mock_server)
+                .await;
+
+            let provider = create_provider_with_mock(&mock_server).await;
+            let repos: Vec<_> = provider
+                .list_repositories(Some("mygroup"), None, 10)
+                .collect()
+                .await;
+
+            assert_eq!(repos.len(), 1);
+            assert_eq!(repos[0].as_ref().unwrap().name, "group-repo");
+        }
+
+        #[tokio::test]
+        async fn test_get_latest_commit_success() {
+            let mock_server = MockServer::start().await;
+
+            Mock::given(method("GET"))
+                .and(path(
+                    "/api/v4/projects/owner%2Frepo/repository/commits/main",
+                ))
+                .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                    "id": "abc123def456"
+                })))
+                .mount(&mock_server)
+                .await;
+
+            let provider = create_provider_with_mock(&mock_server).await;
+            let result = provider
+                .get_latest_commit("owner", "repo", Some("main"))
+                .await;
+
+            assert!(result.is_ok());
+            assert_eq!(result.unwrap(), "abc123def456");
+        }
+
+        #[tokio::test]
+        async fn test_get_latest_commit_uses_default_branch() {
+            let mock_server = MockServer::start().await;
+
+            // First call to get project for default branch
+            Mock::given(method("GET"))
+                .and(path("/api/v4/projects/owner%2Frepo"))
+                .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                    "path": "repo",
+                    "path_with_namespace": "owner/repo",
+                    "http_url_to_repo": "https://gitlab.com/owner/repo.git",
+                    "default_branch": "develop",
+                    "namespace": { "path": "owner" }
+                })))
+                .mount(&mock_server)
+                .await;
+
+            // Then call to get commit for that branch
+            Mock::given(method("GET"))
+                .and(path(
+                    "/api/v4/projects/owner%2Frepo/repository/commits/develop",
+                ))
+                .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                    "id": "def789"
+                })))
+                .mount(&mock_server)
+                .await;
+
+            let provider = create_provider_with_mock(&mock_server).await;
+            let result = provider.get_latest_commit("owner", "repo", None).await;
+
+            assert!(result.is_ok());
+            assert_eq!(result.unwrap(), "def789");
+        }
+
+        #[tokio::test]
+        async fn test_get_default_branch_success() {
+            let mock_server = MockServer::start().await;
+
+            Mock::given(method("GET"))
+                .and(path("/api/v4/projects/owner%2Frepo"))
+                .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                    "path": "repo",
+                    "path_with_namespace": "owner/repo",
+                    "http_url_to_repo": "https://gitlab.com/owner/repo.git",
+                    "default_branch": "develop",
+                    "namespace": { "path": "owner" }
+                })))
+                .mount(&mock_server)
+                .await;
+
+            let provider = create_provider_with_mock(&mock_server).await;
+            let result = provider.get_default_branch("owner", "repo").await;
+
+            assert!(result.is_ok());
+            assert_eq!(result.unwrap(), "develop");
+        }
+
+        #[tokio::test]
+        async fn test_list_repositories_unauthorized() {
+            let mock_server = MockServer::start().await;
+
+            Mock::given(method("GET"))
+                .and(path("/api/v4/projects"))
+                .respond_with(ResponseTemplate::new(401).set_body_json(serde_json::json!({
+                    "message": "401 Unauthorized"
+                })))
+                .mount(&mock_server)
+                .await;
+
+            let provider = create_provider_with_mock(&mock_server).await;
+            let repos: Vec<_> = provider.list_repositories(None, None, 10).collect().await;
+
+            assert_eq!(repos.len(), 1);
+            assert!(repos[0].is_err());
+            assert!(matches!(
+                repos[0].as_ref().unwrap_err(),
+                ProviderError::AuthenticationError(_)
+            ));
+        }
+    }
 }

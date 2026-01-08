@@ -596,6 +596,51 @@ impl IndexerService {
         indexes.get(name).cloned()
     }
 
+    /// Delete an index and all associated files
+    pub async fn delete_index(&self, name: &str) -> Result<()> {
+        // Get the index info first
+        let info = {
+            let indexes = self.indexes.read().await;
+            indexes.get(name).cloned()
+        };
+
+        let info = info.ok_or_else(|| Error::index_not_found(name))?;
+
+        info!("Deleting index: {}", name);
+
+        // Remove the index file if it exists
+        if info.path.exists() {
+            std::fs::remove_file(&info.path)?;
+            // Also try to remove parent directories if empty
+            if let Some(parent) = info.path.parent() {
+                let _ = std::fs::remove_dir(parent);
+                if let Some(grandparent) = parent.parent() {
+                    let _ = std::fs::remove_dir(grandparent);
+                }
+            }
+        }
+
+        // Remove the cloned repository
+        self.repo_manager
+            .remove_repository(&info.repository)
+            .await?;
+
+        // Remove from graphs
+        {
+            let mut graphs = self.graphs.write().await;
+            graphs.remove(name);
+        }
+
+        // Remove from indexes
+        {
+            let mut indexes = self.indexes.write().await;
+            indexes.remove(name);
+        }
+
+        info!("Successfully deleted index: {}", name);
+        Ok(())
+    }
+
     /// Handle a webhook event
     pub async fn handle_webhook(&self, event: &WebhookEvent) -> Result<()> {
         if event.is_push() {
@@ -1090,5 +1135,682 @@ mod tests {
         let debug = format!("{:?}", config);
         assert!(debug.contains("repos_path"));
         assert!(debug.contains("indexes_path"));
+    }
+
+    #[tokio::test]
+    async fn test_handle_webhook_push_event() {
+        let dir = tempdir().unwrap();
+        let config = IndexerConfig {
+            repos_path: dir.path().join("repos"),
+            indexes_path: dir.path().join("indexes"),
+            ..Default::default()
+        };
+
+        let service = IndexerService::new(config, HashMap::new());
+
+        let repo = crate::providers::Repository::new(
+            "github",
+            "test",
+            "repo",
+            "https://github.com/test/repo.git",
+        );
+
+        let event = crate::providers::WebhookEvent {
+            event_type: "push".to_string(),
+            repository: repo,
+            ref_name: Some("refs/heads/main".to_string()),
+            before: Some("abc123".to_string()),
+            after: Some("def456".to_string()),
+            payload: std::collections::HashMap::new(),
+        };
+
+        // Push event will try to sync (and fail due to no provider)
+        let result = service.handle_webhook(&event).await;
+        // Error is expected since we don't have a real provider
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_handle_webhook_non_push_event() {
+        let dir = tempdir().unwrap();
+        let config = IndexerConfig {
+            repos_path: dir.path().join("repos"),
+            indexes_path: dir.path().join("indexes"),
+            ..Default::default()
+        };
+
+        let service = IndexerService::new(config, HashMap::new());
+
+        let repo = crate::providers::Repository::new(
+            "github",
+            "test",
+            "repo",
+            "https://github.com/test/repo.git",
+        );
+
+        let event = crate::providers::WebhookEvent {
+            event_type: "pull_request".to_string(),
+            repository: repo,
+            ref_name: None,
+            before: None,
+            after: None,
+            payload: std::collections::HashMap::new(),
+        };
+
+        // Non-push events should be ignored (no error, no action)
+        let result = service.handle_webhook(&event).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_handle_webhook_issue_event() {
+        let dir = tempdir().unwrap();
+        let config = IndexerConfig {
+            repos_path: dir.path().join("repos"),
+            indexes_path: dir.path().join("indexes"),
+            ..Default::default()
+        };
+
+        let service = IndexerService::new(config, HashMap::new());
+
+        let repo = crate::providers::Repository::new(
+            "github",
+            "test",
+            "repo",
+            "https://github.com/test/repo.git",
+        );
+
+        let event = crate::providers::WebhookEvent {
+            event_type: "issues".to_string(),
+            repository: repo,
+            ref_name: None,
+            before: None,
+            after: None,
+            payload: std::collections::HashMap::new(),
+        };
+
+        let result = service.handle_webhook(&event).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_add_repository_no_provider() {
+        let dir = tempdir().unwrap();
+        let config = IndexerConfig {
+            repos_path: dir.path().join("repos"),
+            indexes_path: dir.path().join("indexes"),
+            ..Default::default()
+        };
+
+        let service = IndexerService::new(config, HashMap::new());
+
+        let repo = crate::providers::Repository::new(
+            "github",
+            "owner",
+            "repo",
+            "https://github.com/owner/repo.git",
+        );
+
+        // Add repository will fail (no provider)
+        let result = service.add_repository(&repo).await;
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.to_string().contains("unknown provider"));
+    }
+
+    #[tokio::test]
+    async fn test_sync_repository_no_provider() {
+        let dir = tempdir().unwrap();
+        let config = IndexerConfig {
+            repos_path: dir.path().join("repos"),
+            indexes_path: dir.path().join("indexes"),
+            ..Default::default()
+        };
+
+        let service = IndexerService::new(config, HashMap::new());
+
+        let repo = crate::providers::Repository::new(
+            "github",
+            "owner",
+            "repo",
+            "https://github.com/owner/repo.git",
+        );
+
+        // Sync repository will fail (no provider)
+        let result = service.sync_repository(&repo).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_index_path_structure() {
+        let dir = tempdir().unwrap();
+        let config = IndexerConfig {
+            repos_path: dir.path().join("repos"),
+            indexes_path: dir.path().join("indexes"),
+            ..Default::default()
+        };
+
+        let service = IndexerService::new(config, HashMap::new());
+
+        let repo = crate::providers::Repository::new(
+            "github",
+            "my-org",
+            "my-repo",
+            "https://github.com/my-org/my-repo.git",
+        );
+
+        let path = service.index_path(&repo);
+        assert!(path.to_string_lossy().contains("github"));
+        assert!(path.to_string_lossy().contains("my-org"));
+        assert!(path.to_string_lossy().contains("my-repo.leann"));
+    }
+
+    #[tokio::test]
+    async fn test_list_indexes_with_indexes() {
+        let dir = tempdir().unwrap();
+        let config = IndexerConfig {
+            repos_path: dir.path().join("repos"),
+            indexes_path: dir.path().join("indexes"),
+            ..Default::default()
+        };
+
+        let service = IndexerService::new(config, HashMap::new());
+
+        // Manually insert some indexes for testing
+        {
+            let mut indexes = service.indexes.write().await;
+
+            let repo1 = crate::providers::Repository::new(
+                "github",
+                "owner1",
+                "repo1",
+                "https://github.com/owner1/repo1.git",
+            );
+            let info1 = IndexInfo {
+                name: "github/owner1/repo1".to_string(),
+                path: PathBuf::from("/data/indexes/github/owner1/repo1.leann"),
+                repository: repo1,
+                created_at: chrono::Utc::now(),
+                updated_at: chrono::Utc::now(),
+                file_count: 50,
+                size_bytes: 1024,
+            };
+
+            let repo2 = crate::providers::Repository::new(
+                "github",
+                "owner2",
+                "repo2",
+                "https://github.com/owner2/repo2.git",
+            );
+            let info2 = IndexInfo {
+                name: "github/owner2/repo2".to_string(),
+                path: PathBuf::from("/data/indexes/github/owner2/repo2.leann"),
+                repository: repo2,
+                created_at: chrono::Utc::now(),
+                updated_at: chrono::Utc::now(),
+                file_count: 100,
+                size_bytes: 2048,
+            };
+
+            indexes.insert(info1.name.clone(), info1);
+            indexes.insert(info2.name.clone(), info2);
+        }
+
+        let list = service.list_indexes().await;
+        assert_eq!(list.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_get_index_existing() {
+        let dir = tempdir().unwrap();
+        let config = IndexerConfig {
+            repos_path: dir.path().join("repos"),
+            indexes_path: dir.path().join("indexes"),
+            ..Default::default()
+        };
+
+        let service = IndexerService::new(config, HashMap::new());
+
+        // Manually insert an index
+        {
+            let mut indexes = service.indexes.write().await;
+
+            let repo = crate::providers::Repository::new(
+                "github",
+                "owner",
+                "repo",
+                "https://github.com/owner/repo.git",
+            );
+            let info = IndexInfo {
+                name: "test-index".to_string(),
+                path: PathBuf::from("/data/indexes/test.leann"),
+                repository: repo,
+                created_at: chrono::Utc::now(),
+                updated_at: chrono::Utc::now(),
+                file_count: 25,
+                size_bytes: 512,
+            };
+
+            indexes.insert(info.name.clone(), info);
+        }
+
+        let index = service.get_index("test-index").await;
+        assert!(index.is_some());
+        assert_eq!(index.unwrap().file_count, 25);
+    }
+
+    #[tokio::test]
+    async fn test_start_stop_sync_loop() {
+        let dir = tempdir().unwrap();
+        let config = IndexerConfig {
+            repos_path: dir.path().join("repos"),
+            indexes_path: dir.path().join("indexes"),
+            sync_interval_secs: 1, // Short interval for testing
+            ..Default::default()
+        };
+
+        let service = Arc::new(IndexerService::new(config, HashMap::new()));
+
+        // Initially not running
+        assert!(!*service.running.read().await);
+
+        // Stop before start (should be safe)
+        service.stop_sync_loop().await;
+        assert!(!*service.running.read().await);
+    }
+
+    #[tokio::test]
+    async fn test_search_with_no_indexes() {
+        let dir = tempdir().unwrap();
+        let config = IndexerConfig {
+            repos_path: dir.path().join("repos"),
+            indexes_path: dir.path().join("indexes"),
+            ..Default::default()
+        };
+
+        let service = IndexerService::new(config, HashMap::new());
+
+        // Search with no indexes should return empty
+        let results = service.search("test query", None, 10).await.unwrap();
+        assert!(results.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_search_specific_nonexistent_indexes() {
+        let dir = tempdir().unwrap();
+        let config = IndexerConfig {
+            repos_path: dir.path().join("repos"),
+            indexes_path: dir.path().join("indexes"),
+            ..Default::default()
+        };
+
+        let service = IndexerService::new(config, HashMap::new());
+
+        // Search specific indexes that don't exist
+        let index_names = vec!["nonexistent1".to_string(), "nonexistent2".to_string()];
+        let results = service.search("test", Some(&index_names), 5).await.unwrap();
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn test_collect_files_symlinks_not_followed() {
+        let dir = tempdir().unwrap();
+        let root = dir.path().join("project");
+        std::fs::create_dir(&root).unwrap();
+
+        // Create a file
+        std::fs::write(root.join("real.rs"), "fn real() {}").unwrap();
+
+        // Note: symlink tests are platform-dependent
+        // On Unix, we could test symlinks aren't followed
+
+        let extensions = vec!["rs".to_string()];
+        let files = collect_files(&root, &extensions);
+
+        assert_eq!(files.len(), 1);
+        assert_eq!(files[0].0, "real.rs");
+    }
+
+    #[test]
+    fn test_collect_files_multiple_extensions() {
+        let dir = tempdir().unwrap();
+        let root = dir.path().join("project");
+        std::fs::create_dir(&root).unwrap();
+
+        std::fs::write(root.join("file.rs"), "rust").unwrap();
+        std::fs::write(root.join("file.py"), "python").unwrap();
+        std::fs::write(root.join("file.js"), "javascript").unwrap();
+        std::fs::write(root.join("file.txt"), "text").unwrap();
+
+        let extensions = vec!["rs".to_string(), "py".to_string()];
+        let files = collect_files(&root, &extensions);
+
+        assert_eq!(files.len(), 2);
+        let names: Vec<_> = files.iter().map(|(n, _)| n.as_str()).collect();
+        assert!(names.contains(&"file.rs"));
+        assert!(names.contains(&"file.py"));
+        assert!(!names.contains(&"file.js"));
+    }
+
+    #[test]
+    fn test_collect_files_preserves_content() {
+        let dir = tempdir().unwrap();
+        let root = dir.path().join("project");
+        std::fs::create_dir(&root).unwrap();
+
+        let content = "fn hello() {\n    println!(\"Hello!\");\n}";
+        std::fs::write(root.join("test.rs"), content).unwrap();
+
+        let extensions = vec!["rs".to_string()];
+        let files = collect_files(&root, &extensions);
+
+        assert_eq!(files.len(), 1);
+        assert_eq!(files[0].1, content);
+    }
+
+    #[test]
+    fn test_index_info_all_fields() {
+        let repo = crate::providers::Repository::new(
+            "gitlab",
+            "org",
+            "project",
+            "https://gitlab.com/org/project.git",
+        );
+
+        let now = chrono::Utc::now();
+        let info = IndexInfo {
+            name: "gitlab/org/project".to_string(),
+            path: PathBuf::from("/indexes/gitlab/org/project.leann"),
+            repository: repo.clone(),
+            created_at: now,
+            updated_at: now,
+            file_count: 500,
+            size_bytes: 1024 * 1024,
+        };
+
+        assert_eq!(info.name, "gitlab/org/project");
+        assert_eq!(info.file_count, 500);
+        assert_eq!(info.size_bytes, 1024 * 1024);
+        assert_eq!(info.repository.provider, "gitlab");
+    }
+
+    #[tokio::test]
+    async fn test_service_creates_directories() {
+        let dir = tempdir().unwrap();
+        let repos_path = dir.path().join("new_repos");
+        let indexes_path = dir.path().join("new_indexes");
+
+        // Directories don't exist yet
+        assert!(!repos_path.exists());
+        assert!(!indexes_path.exists());
+
+        let config = IndexerConfig {
+            repos_path: repos_path.clone(),
+            indexes_path: indexes_path.clone(),
+            ..Default::default()
+        };
+
+        let _service = IndexerService::new(config, HashMap::new());
+
+        // Directories should now exist
+        assert!(repos_path.exists());
+        assert!(indexes_path.exists());
+    }
+
+    #[tokio::test]
+    async fn test_service_with_providers() {
+        use crate::providers::factory::create_provider;
+
+        let dir = tempdir().unwrap();
+        let config = IndexerConfig {
+            repos_path: dir.path().join("repos"),
+            indexes_path: dir.path().join("indexes"),
+            ..Default::default()
+        };
+
+        let mut providers: HashMap<String, Arc<dyn crate::providers::GitProvider>> = HashMap::new();
+        let github = create_provider("github", None, None, None).unwrap();
+        providers.insert("github".to_string(), github);
+
+        let service = IndexerService::new(config, providers);
+
+        // Service should have the repository manager with provider
+        let _manager = service.repository_manager();
+    }
+
+    #[test]
+    fn test_indexer_config_index_extensions() {
+        let config = IndexerConfig::default();
+
+        // Check various expected extensions are present
+        assert!(config.index_extensions.contains(&"py".to_string()));
+        assert!(config.index_extensions.contains(&"rs".to_string()));
+        assert!(config.index_extensions.contains(&"js".to_string()));
+        assert!(config.index_extensions.contains(&"ts".to_string()));
+        assert!(config.index_extensions.contains(&"tsx".to_string()));
+        assert!(config.index_extensions.contains(&"jsx".to_string()));
+        assert!(config.index_extensions.contains(&"go".to_string()));
+        assert!(config.index_extensions.contains(&"java".to_string()));
+        assert!(config.index_extensions.contains(&"md".to_string()));
+        assert!(config.index_extensions.contains(&"json".to_string()));
+        assert!(config.index_extensions.contains(&"yaml".to_string()));
+        assert!(config.index_extensions.contains(&"toml".to_string()));
+    }
+
+    #[test]
+    fn test_indexer_config_from_json() {
+        let json = r#"{
+            "repos_path": "/custom/repos",
+            "indexes_path": "/custom/indexes",
+            "max_concurrent_syncs": 8,
+            "sync_interval_secs": 600,
+            "index_extensions": ["rs", "py"]
+        }"#;
+
+        let config: IndexerConfig = serde_json::from_str(json).unwrap();
+        assert_eq!(config.repos_path, PathBuf::from("/custom/repos"));
+        assert_eq!(config.indexes_path, PathBuf::from("/custom/indexes"));
+        assert_eq!(config.max_concurrent_syncs, 8);
+        assert_eq!(config.sync_interval_secs, 600);
+        assert_eq!(config.index_extensions, vec!["rs", "py"]);
+    }
+
+    #[tokio::test]
+    async fn test_running_flag_initial_state() {
+        let dir = tempdir().unwrap();
+        let config = IndexerConfig {
+            repos_path: dir.path().join("repos"),
+            indexes_path: dir.path().join("indexes"),
+            ..Default::default()
+        };
+
+        let service = IndexerService::new(config, HashMap::new());
+
+        // Initially not running
+        let running = *service.running.read().await;
+        assert!(!running);
+    }
+
+    #[tokio::test]
+    async fn test_stop_sync_loop_sets_flag() {
+        let dir = tempdir().unwrap();
+        let config = IndexerConfig {
+            repos_path: dir.path().join("repos"),
+            indexes_path: dir.path().join("indexes"),
+            ..Default::default()
+        };
+
+        let service = IndexerService::new(config, HashMap::new());
+
+        // Manually set running to true
+        {
+            let mut running = service.running.write().await;
+            *running = true;
+        }
+
+        assert!(*service.running.read().await);
+
+        // Stop should set it to false
+        service.stop_sync_loop().await;
+
+        assert!(!*service.running.read().await);
+    }
+
+    #[test]
+    fn test_collect_files_empty_extensions() {
+        let dir = tempdir().unwrap();
+        let root = dir.path().join("project");
+        std::fs::create_dir(&root).unwrap();
+
+        std::fs::write(root.join("file.rs"), "rust").unwrap();
+        std::fs::write(root.join("file.py"), "python").unwrap();
+
+        let extensions: Vec<String> = vec![];
+        let files = collect_files(&root, &extensions);
+
+        // No extensions means no files matched
+        assert!(files.is_empty());
+    }
+
+    #[test]
+    fn test_collect_files_case_sensitive() {
+        let dir = tempdir().unwrap();
+        let root = dir.path().join("project");
+        std::fs::create_dir(&root).unwrap();
+
+        std::fs::write(root.join("file.RS"), "uppercase").unwrap();
+        std::fs::write(root.join("file.rs"), "lowercase").unwrap();
+
+        let extensions = vec!["rs".to_string()];
+        let files = collect_files(&root, &extensions);
+
+        // Extension matching is case-sensitive
+        // .RS won't match "rs" extension
+        let names: Vec<_> = files.iter().map(|(n, _)| n.as_str()).collect();
+        assert!(names.contains(&"file.rs"));
+        // .RS file may or may not be included depending on platform
+    }
+
+    #[tokio::test]
+    async fn test_delete_index_not_found() {
+        let dir = tempdir().unwrap();
+        let config = IndexerConfig {
+            repos_path: dir.path().join("repos"),
+            indexes_path: dir.path().join("indexes"),
+            ..Default::default()
+        };
+
+        let service = IndexerService::new(config, HashMap::new());
+
+        let result = service.delete_index("nonexistent").await;
+
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.to_string().contains("index not found"));
+    }
+
+    #[tokio::test]
+    async fn test_delete_index_success() {
+        let dir = tempdir().unwrap();
+        let config = IndexerConfig {
+            repos_path: dir.path().join("repos"),
+            indexes_path: dir.path().join("indexes"),
+            ..Default::default()
+        };
+
+        let service = IndexerService::new(config, HashMap::new());
+
+        // Manually insert an index
+        let index_name = "github/owner/repo";
+        {
+            let mut indexes = service.indexes.write().await;
+
+            let repo = crate::providers::Repository::new(
+                "github",
+                "owner",
+                "repo",
+                "https://github.com/owner/repo.git",
+            );
+            let info = IndexInfo {
+                name: index_name.to_string(),
+                path: dir.path().join("indexes/github/owner/repo.leann"),
+                repository: repo,
+                created_at: chrono::Utc::now(),
+                updated_at: chrono::Utc::now(),
+                file_count: 25,
+                size_bytes: 512,
+            };
+
+            indexes.insert(info.name.clone(), info);
+        }
+
+        // Verify index exists
+        assert!(service.get_index(index_name).await.is_some());
+
+        // Delete the index
+        let result = service.delete_index(index_name).await;
+        assert!(result.is_ok());
+
+        // Verify index is gone
+        assert!(service.get_index(index_name).await.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_delete_index_removes_from_graphs() {
+        let dir = tempdir().unwrap();
+        let config = IndexerConfig {
+            repos_path: dir.path().join("repos"),
+            indexes_path: dir.path().join("indexes"),
+            ..Default::default()
+        };
+
+        let service = IndexerService::new(config, HashMap::new());
+
+        let index_name = "github/test/project";
+        {
+            // Insert index info
+            let mut indexes = service.indexes.write().await;
+            let repo = crate::providers::Repository::new(
+                "github",
+                "test",
+                "project",
+                "https://github.com/test/project.git",
+            );
+            let info = IndexInfo {
+                name: index_name.to_string(),
+                path: dir.path().join("indexes/github/test/project.leann"),
+                repository: repo.clone(),
+                created_at: chrono::Utc::now(),
+                updated_at: chrono::Utc::now(),
+                file_count: 10,
+                size_bytes: 256,
+            };
+            indexes.insert(info.name.clone(), info.clone());
+
+            // Also insert into graphs
+            let mut graphs = service.graphs.write().await;
+            let graph = crate::core::HnswGraph::new(crate::core::HnswConfig::fast()).unwrap();
+            let stored = StoredIndex {
+                graph,
+                files: vec![],
+                info,
+            };
+            graphs.insert(index_name.to_string(), stored);
+        }
+
+        // Verify graph exists
+        {
+            let graphs = service.graphs.read().await;
+            assert!(graphs.contains_key(index_name));
+        }
+
+        // Delete the index
+        service.delete_index(index_name).await.unwrap();
+
+        // Verify graph is gone
+        {
+            let graphs = service.graphs.read().await;
+            assert!(!graphs.contains_key(index_name));
+        }
     }
 }

@@ -769,4 +769,333 @@ mod tests {
         let result = provider.parse_webhook(&headers, body).await.unwrap();
         assert!(result.is_none());
     }
+
+    mod http_mock_tests {
+        use super::*;
+        use futures::StreamExt;
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        async fn create_provider_with_mock(mock_server: &MockServer) -> BitbucketProvider {
+            let config = ProviderConfig {
+                base_url: mock_server.uri(),
+                auth: Some(ProviderAuth::token("test-token")),
+                ..Default::default()
+            };
+            BitbucketProvider::new(config).unwrap()
+        }
+
+        #[tokio::test]
+        async fn test_get_repository_success() {
+            let mock_server = MockServer::start().await;
+
+            Mock::given(method("GET"))
+                .and(path("/repositories/owner/repo"))
+                .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                    "slug": "repo",
+                    "full_name": "owner/repo",
+                    "description": "Test repository",
+                    "language": "Rust",
+                    "size": 1048576,
+                    "updated_on": "2024-01-15T10:30:00Z",
+                    "is_private": false,
+                    "mainbranch": { "name": "main" },
+                    "owner": { "username": "owner" },
+                    "links": {
+                        "clone": [
+                            { "name": "https", "href": "https://bitbucket.org/owner/repo.git" },
+                            { "name": "ssh", "href": "git@bitbucket.org:owner/repo.git" }
+                        ]
+                    }
+                })))
+                .mount(&mock_server)
+                .await;
+
+            let provider = create_provider_with_mock(&mock_server).await;
+            let result = provider.get_repository("owner", "repo").await;
+
+            assert!(result.is_ok());
+            let repo = result.unwrap();
+            assert_eq!(repo.name, "repo");
+            assert_eq!(repo.owner, "owner");
+            assert_eq!(repo.default_branch, "main");
+            assert_eq!(repo.language, Some("Rust".to_string()));
+        }
+
+        #[tokio::test]
+        async fn test_get_repository_not_found() {
+            let mock_server = MockServer::start().await;
+
+            Mock::given(method("GET"))
+                .and(path("/repositories/owner/nonexistent"))
+                .respond_with(ResponseTemplate::new(404).set_body_json(serde_json::json!({
+                    "error": { "message": "Repository owner/nonexistent not found" }
+                })))
+                .mount(&mock_server)
+                .await;
+
+            let provider = create_provider_with_mock(&mock_server).await;
+            let result = provider.get_repository("owner", "nonexistent").await;
+
+            assert!(result.is_err());
+            assert!(matches!(result.unwrap_err(), ProviderError::NotFound(_)));
+        }
+
+        #[tokio::test]
+        async fn test_get_repository_unauthorized() {
+            let mock_server = MockServer::start().await;
+
+            Mock::given(method("GET"))
+                .and(path("/repositories/owner/private-repo"))
+                .respond_with(ResponseTemplate::new(401).set_body_json(serde_json::json!({
+                    "error": { "message": "Authentication required" }
+                })))
+                .mount(&mock_server)
+                .await;
+
+            let provider = create_provider_with_mock(&mock_server).await;
+            let result = provider.get_repository("owner", "private-repo").await;
+
+            assert!(result.is_err());
+            assert!(matches!(
+                result.unwrap_err(),
+                ProviderError::AuthenticationError(_)
+            ));
+        }
+
+        #[tokio::test]
+        async fn test_get_repository_rate_limited() {
+            let mock_server = MockServer::start().await;
+
+            Mock::given(method("GET"))
+                .and(path("/repositories/owner/repo"))
+                .respond_with(
+                    ResponseTemplate::new(429)
+                        .insert_header("retry-after", "90")
+                        .set_body_json(serde_json::json!({
+                            "error": { "message": "Rate limit exceeded" }
+                        })),
+                )
+                .mount(&mock_server)
+                .await;
+
+            let provider = create_provider_with_mock(&mock_server).await;
+            let result = provider.get_repository("owner", "repo").await;
+
+            assert!(result.is_err());
+            match result.unwrap_err() {
+                ProviderError::RateLimitExceeded { retry_after_secs } => {
+                    assert_eq!(retry_after_secs, 90);
+                }
+                e => panic!("Expected RateLimitExceeded, got {:?}", e),
+            }
+        }
+
+        #[tokio::test]
+        async fn test_list_repositories_for_workspace() {
+            let mock_server = MockServer::start().await;
+
+            Mock::given(method("GET"))
+                .and(path("/repositories/myworkspace"))
+                .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                    "values": [
+                        {
+                            "slug": "repo1",
+                            "full_name": "myworkspace/repo1",
+                            "mainbranch": { "name": "main" },
+                            "workspace": { "slug": "myworkspace" },
+                            "links": {
+                                "clone": [
+                                    { "name": "https", "href": "https://bitbucket.org/myworkspace/repo1.git" }
+                                ]
+                            }
+                        },
+                        {
+                            "slug": "repo2",
+                            "full_name": "myworkspace/repo2",
+                            "mainbranch": { "name": "main" },
+                            "workspace": { "slug": "myworkspace" },
+                            "links": {
+                                "clone": [
+                                    { "name": "https", "href": "https://bitbucket.org/myworkspace/repo2.git" }
+                                ]
+                            }
+                        }
+                    ],
+                    "next": null
+                })))
+                .mount(&mock_server)
+                .await;
+
+            let provider = create_provider_with_mock(&mock_server).await;
+            let repos: Vec<_> = provider
+                .list_repositories(Some("myworkspace"), None, 10)
+                .collect()
+                .await;
+
+            assert_eq!(repos.len(), 2);
+            assert!(repos[0].is_ok());
+            assert!(repos[1].is_ok());
+            assert_eq!(repos[0].as_ref().unwrap().name, "repo1");
+            assert_eq!(repos[1].as_ref().unwrap().name, "repo2");
+        }
+
+        #[tokio::test]
+        async fn test_list_repositories_empty() {
+            let mock_server = MockServer::start().await;
+
+            Mock::given(method("GET"))
+                .and(path("/repositories/emptyworkspace"))
+                .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                    "values": [],
+                    "next": null
+                })))
+                .mount(&mock_server)
+                .await;
+
+            let provider = create_provider_with_mock(&mock_server).await;
+            let repos: Vec<_> = provider
+                .list_repositories(Some("emptyworkspace"), None, 10)
+                .collect()
+                .await;
+
+            assert!(repos.is_empty());
+        }
+
+        #[tokio::test]
+        async fn test_get_latest_commit_success() {
+            let mock_server = MockServer::start().await;
+
+            Mock::given(method("GET"))
+                .and(path("/repositories/owner/repo/commits/main"))
+                .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                    "values": [
+                        { "hash": "abc123def456" }
+                    ]
+                })))
+                .mount(&mock_server)
+                .await;
+
+            let provider = create_provider_with_mock(&mock_server).await;
+            let result = provider
+                .get_latest_commit("owner", "repo", Some("main"))
+                .await;
+
+            assert!(result.is_ok());
+            assert_eq!(result.unwrap(), "abc123def456");
+        }
+
+        #[tokio::test]
+        async fn test_get_latest_commit_uses_default_branch() {
+            let mock_server = MockServer::start().await;
+
+            // First call to get repository for default branch
+            Mock::given(method("GET"))
+                .and(path("/repositories/owner/repo"))
+                .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                    "slug": "repo",
+                    "full_name": "owner/repo",
+                    "mainbranch": { "name": "develop" },
+                    "owner": { "username": "owner" },
+                    "links": {
+                        "clone": [
+                            { "name": "https", "href": "https://bitbucket.org/owner/repo.git" }
+                        ]
+                    }
+                })))
+                .mount(&mock_server)
+                .await;
+
+            // Then call to get commit for that branch
+            Mock::given(method("GET"))
+                .and(path("/repositories/owner/repo/commits/develop"))
+                .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                    "values": [
+                        { "hash": "def789" }
+                    ]
+                })))
+                .mount(&mock_server)
+                .await;
+
+            let provider = create_provider_with_mock(&mock_server).await;
+            let result = provider.get_latest_commit("owner", "repo", None).await;
+
+            assert!(result.is_ok());
+            assert_eq!(result.unwrap(), "def789");
+        }
+
+        #[tokio::test]
+        async fn test_get_default_branch_success() {
+            let mock_server = MockServer::start().await;
+
+            Mock::given(method("GET"))
+                .and(path("/repositories/owner/repo"))
+                .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                    "slug": "repo",
+                    "full_name": "owner/repo",
+                    "mainbranch": { "name": "develop" },
+                    "owner": { "username": "owner" },
+                    "links": {
+                        "clone": [
+                            { "name": "https", "href": "https://bitbucket.org/owner/repo.git" }
+                        ]
+                    }
+                })))
+                .mount(&mock_server)
+                .await;
+
+            let provider = create_provider_with_mock(&mock_server).await;
+            let result = provider.get_default_branch("owner", "repo").await;
+
+            assert!(result.is_ok());
+            assert_eq!(result.unwrap(), "develop");
+        }
+
+        #[tokio::test]
+        async fn test_list_repositories_unauthorized() {
+            let mock_server = MockServer::start().await;
+
+            Mock::given(method("GET"))
+                .and(path("/repositories/owner"))
+                .respond_with(ResponseTemplate::new(401).set_body_json(serde_json::json!({
+                    "error": { "message": "Authentication required" }
+                })))
+                .mount(&mock_server)
+                .await;
+
+            let provider = create_provider_with_mock(&mock_server).await;
+            let repos: Vec<_> = provider
+                .list_repositories(Some("owner"), None, 10)
+                .collect()
+                .await;
+
+            assert_eq!(repos.len(), 1);
+            assert!(repos[0].is_err());
+            assert!(matches!(
+                repos[0].as_ref().unwrap_err(),
+                ProviderError::AuthenticationError(_)
+            ));
+        }
+
+        #[tokio::test]
+        async fn test_get_latest_commit_no_commits() {
+            let mock_server = MockServer::start().await;
+
+            Mock::given(method("GET"))
+                .and(path("/repositories/owner/repo/commits/main"))
+                .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                    "values": []
+                })))
+                .mount(&mock_server)
+                .await;
+
+            let provider = create_provider_with_mock(&mock_server).await;
+            let result = provider
+                .get_latest_commit("owner", "repo", Some("main"))
+                .await;
+
+            assert!(result.is_err());
+            assert!(matches!(result.unwrap_err(), ProviderError::NotFound(_)));
+        }
+    }
 }
