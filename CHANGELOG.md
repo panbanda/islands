@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.2.0](https://github.com/panbanda/islands/compare/islands-v1.1.0...islands-v1.2.0) (2026-01-09)
+
+
+### Features
+
+* add native Candle embedding provider ([9452cec](https://github.com/panbanda/islands/commit/9452cec59c3106e52e6b9d2237b26af1164f6a9e))
+* add native Candle embedding provider ([99b6894](https://github.com/panbanda/islands/commit/99b68947204c132e8943953672c52755597b000b))
+
+
+### Bug Fixes
+
+* add User-Agent header to HTTP client ([38ef606](https://github.com/panbanda/islands/commit/38ef606c227a2deb7f7199d5cc5cf4b28c3aefa8))
+
 ## [1.1.0](https://github.com/panbanda/islands/compare/islands-v1.0.2...islands-v1.1.0) (2026-01-08)
 
 
