@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.3.0](https://github.com/panbanda/islands/compare/islands-v1.2.0...islands-v1.3.0) (2026-01-09)
+
+
+### Features
+
+* add progress bars for indexing and file processing ([8edbe20](https://github.com/panbanda/islands/commit/8edbe20bb66ced49f2e3b8fc39b48a2858e1b57d))
+* add progress bars for indexing and file processing ([fd6fb02](https://github.com/panbanda/islands/commit/fd6fb02b987e2dc7a4316a56e301124d3e341227))
+
 ## [1.2.0](https://github.com/panbanda/islands/compare/islands-v1.1.0...islands-v1.2.0) (2026-01-09)
 
 
