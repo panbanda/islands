@@ -32,10 +32,16 @@ pub async fn add_repository(config: &Config, url: &str, token: Option<&str>) -> 
 
     spinner.set_message(format!("Cloning {}...", repo.full_name));
 
-    // Add and index
-    let state = indexer.add_repository(&repo).await?;
-
+    // Clone first (spinner for this phase)
+    let state = indexer.repository_manager().clone_repository(&repo).await?;
     spinner.finish_and_clear();
+
+    // Now index with progress bar
+    let progress = output::progress_bar(0, "Indexing files...");
+    indexer
+        .index_repository_with_progress(&repo, Some(&progress))
+        .await?;
+    progress.finish_and_clear();
 
     output::success(&format!("Successfully indexed {}", repo.full_name));
     println!("  Commit: {}", state.last_commit.unwrap_or_default());
@@ -133,9 +139,25 @@ pub async fn sync_repository(config: &Config, index_name: &str) -> Result<()> {
         .await
         .ok_or_else(|| crate::Error::InvalidArgument(format!("Index not found: {}", index_name)))?;
 
-    let state = indexer.sync_repository(&info.repository).await?;
-
+    // First update the repository
+    let state = indexer
+        .repository_manager()
+        .update_repository(&info.repository)
+        .await?;
     spinner.finish_and_clear();
+
+    // Check if re-indexing is needed
+    if indexer
+        .repository_manager()
+        .needs_reindex(&info.repository)
+        .await
+    {
+        let progress = output::progress_bar(0, "Re-indexing files...");
+        indexer
+            .index_repository_with_progress(&info.repository, Some(&progress))
+            .await?;
+        progress.finish_and_clear();
+    }
 
     output::success(&format!("Synced {}", index_name));
     println!("  Commit: {}", state.last_commit.unwrap_or_default());
