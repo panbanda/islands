@@ -487,6 +487,7 @@ impl BaseProvider {
     /// Create a new base provider.
     pub fn new(config: ProviderConfig) -> Result<Self> {
         let client = Client::builder()
+            .user_agent(concat!("islands/", env!("CARGO_PKG_VERSION")))
             .timeout(Duration::from_secs(30))
             .pool_max_idle_per_host(10)
             .build()

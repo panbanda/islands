@@ -93,6 +93,20 @@ pub enum EmbeddingConfig {
         #[serde(default = "default_batch_size")]
         batch_size: usize,
     },
+    /// Use native Candle inference (sentence-transformers-rs)
+    /// Supports: minilm, bge-small, bge-base, bge-large
+    #[cfg(feature = "embeddings-candle")]
+    Candle {
+        /// Model preset (minilm, bge-small, bge-base, bge-large) or HuggingFace model ID
+        #[serde(default = "default_candle_model")]
+        model: String,
+        /// Device for inference (cpu, metal, cuda)
+        #[serde(default = "default_candle_device")]
+        device: String,
+        /// Batch size for processing
+        #[serde(default = "default_batch_size")]
+        batch_size: usize,
+    },
 }
 
 #[cfg(feature = "embeddings")]
@@ -120,6 +134,16 @@ fn default_cohere_model() -> String {
     "embed-english-v3.0".to_string()
 }
 
+#[cfg(all(feature = "embeddings", feature = "embeddings-candle"))]
+fn default_candle_model() -> String {
+    "minilm".to_string()
+}
+
+#[cfg(all(feature = "embeddings", feature = "embeddings-candle"))]
+fn default_candle_device() -> String {
+    "cpu".to_string()
+}
+
 #[cfg(feature = "embeddings")]
 fn default_batch_size() -> usize {
     32
@@ -133,6 +157,8 @@ impl EmbeddingConfig {
             Self::Local { batch_size, .. }
             | Self::OpenAI { batch_size, .. }
             | Self::Cohere { batch_size, .. } => *batch_size,
+            #[cfg(feature = "embeddings-candle")]
+            Self::Candle { batch_size, .. } => *batch_size,
         }
     }
 }
