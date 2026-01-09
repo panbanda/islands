@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
+use indicatif::ProgressBar;
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 use tokio::time::{Duration, interval};
@@ -342,24 +343,50 @@ impl IndexerService {
 
     /// Add and index a repository
     pub async fn add_repository(&self, repo: &Repository) -> Result<RepositoryState> {
+        self.add_repository_with_progress(repo, None).await
+    }
+
+    /// Add and index a repository with progress reporting
+    pub async fn add_repository_with_progress(
+        &self,
+        repo: &Repository,
+        progress: Option<&ProgressBar>,
+    ) -> Result<RepositoryState> {
         let state = self.repo_manager.clone_repository(repo).await?;
-        self.index_repository(repo).await?;
+        self.index_repository_with_progress(repo, progress).await?;
         Ok(state)
     }
 
     /// Sync a repository and re-index if needed
     pub async fn sync_repository(&self, repo: &Repository) -> Result<RepositoryState> {
+        self.sync_repository_with_progress(repo, None).await
+    }
+
+    /// Sync a repository and re-index if needed with progress reporting
+    pub async fn sync_repository_with_progress(
+        &self,
+        repo: &Repository,
+        progress: Option<&ProgressBar>,
+    ) -> Result<RepositoryState> {
         let state = self.repo_manager.update_repository(repo).await?;
 
         if self.repo_manager.needs_reindex(repo).await {
-            self.index_repository(repo).await?;
+            self.index_repository_with_progress(repo, progress).await?;
         }
 
         Ok(state)
     }
 
-    /// Build a LEANN index for a repository
-    async fn index_repository(&self, repo: &Repository) -> Result<IndexInfo> {
+    /// Build a LEANN index for a repository with progress reporting
+    ///
+    /// If a progress bar is provided, it will be used to report progress during:
+    /// - File collection (counting and reading files)
+    /// - Embedding generation (batch processing)
+    pub async fn index_repository_with_progress(
+        &self,
+        repo: &Repository,
+        progress: Option<&ProgressBar>,
+    ) -> Result<IndexInfo> {
         let state = self
             .repo_manager
             .get_state(repo)
@@ -381,19 +408,48 @@ impl IndexerService {
         let local_path = state.local_path.clone();
         let extensions = self.config.index_extensions.clone();
 
-        let files = tokio::task::spawn_blocking(move || collect_files(&local_path, &extensions))
+        // First count files for progress reporting
+        let (file_count, files) = if let Some(pb) = progress {
+            pb.set_message("Counting files...");
+            let count_path = local_path.clone();
+            let count_ext = extensions.clone();
+            let file_count =
+                tokio::task::spawn_blocking(move || count_matching_files(&count_path, &count_ext))
+                    .await
+                    .map_err(|e| Error::IndexingFailed(e.to_string()))?;
+
+            pb.set_length(file_count as u64);
+            pb.set_position(0);
+            pb.set_message("Collecting files...");
+
+            // Clone the progress bar for the blocking task
+            let pb_clone = pb.clone();
+            let files = tokio::task::spawn_blocking(move || {
+                collect_files_with_progress(&local_path, &extensions, Some(&pb_clone))
+            })
             .await
             .map_err(|e| Error::IndexingFailed(e.to_string()))?;
 
-        let file_count = files.len();
+            pb.set_message("Files collected");
+            (files.len(), files)
+        } else {
+            let files =
+                tokio::task::spawn_blocking(move || collect_files(&local_path, &extensions))
+                    .await
+                    .map_err(|e| Error::IndexingFailed(e.to_string()))?;
+            (files.len(), files)
+        };
+
         info!("Found {} files to index", file_count);
 
         // Build embeddings and index
         #[cfg(feature = "embeddings")]
-        let graph = self.build_index_with_embeddings(&files).await?;
+        let graph = self
+            .build_index_with_embeddings_progress(&files, progress)
+            .await?;
 
         #[cfg(not(feature = "embeddings"))]
-        let graph = self.build_index_placeholder(&files)?;
+        let graph = self.build_index_placeholder_progress(&files, progress)?;
 
         // Mark as indexed
         self.repo_manager.mark_indexed(repo).await;
@@ -431,11 +487,12 @@ impl IndexerService {
         Ok(info)
     }
 
-    /// Build index with actual embeddings from embed_anything
+    /// Build index with actual embeddings from embed_anything with progress tracking
     #[cfg(feature = "embeddings")]
-    async fn build_index_with_embeddings(
+    async fn build_index_with_embeddings_progress(
         &self,
         files: &[(String, String)],
+        progress: Option<&ProgressBar>,
     ) -> Result<crate::core::HnswGraph> {
         let embedder = self.embedder.as_ref().ok_or_else(|| {
             Error::IndexingFailed(
@@ -451,8 +508,15 @@ impl IndexerService {
         let batch_size = self.config.embedding.batch_size();
         let total_batches = (files.len() + batch_size - 1) / batch_size;
 
+        // Reset progress bar for embedding phase
+        if let Some(pb) = progress {
+            pb.set_length(files.len() as u64);
+            pb.set_position(0);
+            pb.set_message("Generating embeddings...");
+        }
+
         for (batch_idx, chunk) in files.chunks(batch_size).enumerate() {
-            debug!(
+            tracing::debug!(
                 "Processing batch {}/{} ({} files)",
                 batch_idx + 1,
                 total_batches,
@@ -474,6 +538,15 @@ impl IndexerService {
                     .insert(embedding)
                     .map_err(|e| Error::IndexingFailed(e.to_string()))?;
             }
+
+            // Update progress
+            if let Some(pb) = progress {
+                pb.inc(chunk.len() as u64);
+            }
+        }
+
+        if let Some(pb) = progress {
+            pb.set_message("Embeddings complete");
         }
 
         info!(
@@ -484,20 +557,36 @@ impl IndexerService {
         Ok(graph)
     }
 
-    /// Build index with placeholder zero embeddings (no embeddings feature)
+    /// Build index with placeholder zero embeddings with progress tracking
     #[cfg(not(feature = "embeddings"))]
-    fn build_index_placeholder(
+    fn build_index_placeholder_progress(
         &self,
         files: &[(String, String)],
+        progress: Option<&ProgressBar>,
     ) -> Result<crate::core::HnswGraph> {
         let mut graph = crate::core::HnswGraph::new(crate::core::HnswConfig::fast())
             .map_err(|e| Error::IndexingFailed(e.to_string()))?;
+
+        // Setup progress bar for indexing phase
+        if let Some(pb) = progress {
+            pb.set_length(files.len() as u64);
+            pb.set_position(0);
+            pb.set_message("Building index...");
+        }
 
         for (_path, _content) in files {
             let embedding = crate::core::embedding::Embedding::zeros(384);
             graph
                 .insert(embedding.into_vec())
                 .map_err(|e| Error::IndexingFailed(e.to_string()))?;
+
+            if let Some(pb) = progress {
+                pb.inc(1);
+            }
+        }
+
+        if let Some(pb) = progress {
+            pb.set_message("Index built");
         }
 
         Ok(graph)
@@ -722,31 +811,49 @@ impl IndexerService {
     }
 }
 
-/// Collect files to index from a directory
-fn collect_files(root: &std::path::Path, extensions: &[String]) -> Vec<(String, String)> {
-    let mut files = Vec::new();
-
-    let walker = walkdir::WalkDir::new(root)
+/// Create a filtered WalkDir iterator for a directory
+fn create_walker(root: &std::path::Path) -> impl Iterator<Item = walkdir::DirEntry> + '_ {
+    walkdir::WalkDir::new(root)
         .follow_links(false)
         .into_iter()
         .filter_entry(|e| {
             let name = e.file_name().to_string_lossy();
             !name.starts_with('.') && name != "node_modules" && name != "target"
-        });
+        })
+        .filter_map(|e| e.ok())
+}
 
-    for entry in walker.filter_map(|e| e.ok()) {
+/// Check if a file matches the extension filter
+fn matches_extension(path: &std::path::Path, extensions: &[String]) -> bool {
+    path.extension()
+        .and_then(|e| e.to_str())
+        .map(|ext| extensions.iter().any(|e| e == ext))
+        .unwrap_or(false)
+}
+
+/// Count files that match the extension filter
+fn count_matching_files(root: &std::path::Path, extensions: &[String]) -> usize {
+    create_walker(root)
+        .filter(|e| e.file_type().is_file() && matches_extension(e.path(), extensions))
+        .count()
+}
+
+/// Collect files to index from a directory with optional progress tracking
+fn collect_files_with_progress(
+    root: &std::path::Path,
+    extensions: &[String],
+    progress: Option<&ProgressBar>,
+) -> Vec<(String, String)> {
+    let mut files = Vec::new();
+
+    for entry in create_walker(root) {
         if !entry.file_type().is_file() {
             continue;
         }
 
         let path = entry.path();
 
-        // Check extension
-        if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
-            if !extensions.iter().any(|e| e == ext) {
-                continue;
-            }
-        } else {
+        if !matches_extension(path, extensions) {
             continue;
         }
 
@@ -758,10 +865,19 @@ fn collect_files(root: &std::path::Path, extensions: &[String]) -> Vec<(String, 
                 .to_string_lossy()
                 .to_string();
             files.push((relative, content));
+
+            if let Some(pb) = progress {
+                pb.inc(1);
+            }
         }
     }
 
     files
+}
+
+/// Collect files to index from a directory
+fn collect_files(root: &std::path::Path, extensions: &[String]) -> Vec<(String, String)> {
+    collect_files_with_progress(root, extensions, None)
 }
 
 #[cfg(test)]
