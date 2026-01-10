@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.1](https://github.com/panbanda/islands/compare/islands-v1.3.0...islands-v1.3.1) (2026-01-10)
+
+
+### Bug Fixes
+
+* support SSH git URLs and improve default paths ([27c296a](https://github.com/panbanda/islands/commit/27c296a151a0eef4ce606bb98d0c7f69df32225a))
+
 ## [1.3.0](https://github.com/panbanda/islands/compare/islands-v1.2.0...islands-v1.3.0) (2026-01-09)
 
 
