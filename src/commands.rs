@@ -762,7 +762,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_operations_with_default_config() {
-        // Create config with default indexer (will use /data/islands paths)
+        // Create config with default indexer (will use ~/.local/share/islands paths)
         // These may fail due to permissions, but shouldn't panic
         let config = Config::default();
 

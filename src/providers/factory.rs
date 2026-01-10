@@ -244,15 +244,22 @@ pub fn create_provider(
 }
 
 /// Parse a repository URL to extract provider type, owner, and name.
+///
+/// Supports all git URL formats via gix-url:
+/// - `https://github.com/owner/repo`
+/// - `git@github.com:owner/repo.git`
+/// - `ssh://git@github.com/owner/repo.git`
+/// - `git://github.com/owner/repo`
 pub fn parse_repo_url(url: &str) -> Result<(ProviderType, String, String, Option<String>)> {
-    let parsed = url::Url::parse(url)
-        .map_err(|e| ProviderError::ConfigurationError(format!("Invalid URL: {}", e)))?;
+    let parsed = gix_url::Url::try_from(url)
+        .map_err(|e| ProviderError::ConfigurationError(format!("Invalid git URL: {}", e)))?;
 
     let host = parsed
-        .host_str()
-        .ok_or_else(|| ProviderError::ConfigurationError("Missing host".to_string()))?;
+        .host()
+        .ok_or_else(|| ProviderError::ConfigurationError("Missing host in URL".to_string()))?
+        .to_string();
 
-    let provider_type = match host {
+    let provider_type = match host.as_str() {
         "github.com" | "www.github.com" => ProviderType::GitHub,
         "gitlab.com" | "www.gitlab.com" => ProviderType::GitLab,
         "bitbucket.org" | "www.bitbucket.org" => ProviderType::Bitbucket,
@@ -260,11 +267,13 @@ pub fn parse_repo_url(url: &str) -> Result<(ProviderType, String, String, Option
     };
 
     let path = parsed
-        .path()
+        .path
+        .to_string()
         .trim_start_matches('/')
-        .trim_end_matches(".git");
-    let parts: Vec<&str> = path.split('/').collect();
+        .trim_end_matches(".git")
+        .to_string();
 
+    let parts: Vec<&str> = path.split('/').collect();
     if parts.len() < 2 {
         return Err(ProviderError::ConfigurationError(
             "URL must contain owner/repo".to_string(),
@@ -275,7 +284,7 @@ pub fn parse_repo_url(url: &str) -> Result<(ProviderType, String, String, Option
     let name = parts[1].to_string();
 
     let base_url = if provider_type == ProviderType::Gitea {
-        Some(format!("{}://{}", parsed.scheme(), host))
+        Some(format!("https://{}", host))
     } else {
         None
     };
@@ -466,5 +475,99 @@ mod tests {
         let p = provider.unwrap();
         assert_eq!(p.provider_name(), "github");
         assert_eq!(p.base_url(), "https://github.example.com/api/v3");
+    }
+
+    #[test]
+    fn test_parse_repo_url_ssh_github() {
+        let result = parse_repo_url("git@github.com:rust-lang/rust.git");
+        assert!(result.is_ok());
+
+        let (provider, owner, name, base_url) = result.unwrap();
+        assert_eq!(provider, ProviderType::GitHub);
+        assert_eq!(owner, "rust-lang");
+        assert_eq!(name, "rust");
+        assert!(base_url.is_none());
+    }
+
+    #[test]
+    fn test_parse_repo_url_ssh_gitlab() {
+        let result = parse_repo_url("git@gitlab.com:group/project.git");
+        assert!(result.is_ok());
+
+        let (provider, owner, name, _) = result.unwrap();
+        assert_eq!(provider, ProviderType::GitLab);
+        assert_eq!(owner, "group");
+        assert_eq!(name, "project");
+    }
+
+    #[test]
+    fn test_parse_repo_url_ssh_bitbucket() {
+        let result = parse_repo_url("git@bitbucket.org:team/repo.git");
+        assert!(result.is_ok());
+
+        let (provider, owner, name, _) = result.unwrap();
+        assert_eq!(provider, ProviderType::Bitbucket);
+        assert_eq!(owner, "team");
+        assert_eq!(name, "repo");
+    }
+
+    #[test]
+    fn test_parse_repo_url_ssh_self_hosted() {
+        let result = parse_repo_url("git@git.example.com:user/project.git");
+        assert!(result.is_ok());
+
+        let (provider, owner, name, base_url) = result.unwrap();
+        assert_eq!(provider, ProviderType::Gitea);
+        assert_eq!(owner, "user");
+        assert_eq!(name, "project");
+        assert_eq!(base_url, Some("https://git.example.com".to_string()));
+    }
+
+    #[test]
+    fn test_parse_repo_url_ssh_without_git_suffix() {
+        let result = parse_repo_url("git@github.com:owner/repo");
+        assert!(result.is_ok());
+
+        let (_, owner, name, _) = result.unwrap();
+        assert_eq!(owner, "owner");
+        assert_eq!(name, "repo");
+    }
+
+    #[test]
+    fn test_gix_url_exploration() {
+        use gix_url::Url;
+
+        // Test various URL formats that gix should support
+        let test_cases = [
+            (
+                "https://github.com/owner/repo.git",
+                "github.com",
+                "owner/repo",
+            ),
+            ("git@github.com:owner/repo.git", "github.com", "owner/repo"),
+            (
+                "ssh://git@github.com/owner/repo.git",
+                "github.com",
+                "owner/repo",
+            ),
+        ];
+
+        for (url_str, expected_host, expected_path) in test_cases {
+            let url =
+                Url::try_from(url_str).unwrap_or_else(|_| panic!("Failed to parse: {}", url_str));
+            assert_eq!(
+                url.host().map(|h| h.to_string()),
+                Some(expected_host.to_string()),
+                "Host mismatch for {}",
+                url_str
+            );
+            let path = url
+                .path
+                .to_string()
+                .trim_start_matches('/')
+                .trim_end_matches(".git")
+                .to_string();
+            assert_eq!(path, expected_path, "Path mismatch for {}", url_str);
+        }
     }
 }

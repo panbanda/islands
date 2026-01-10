@@ -141,6 +141,7 @@ tabled = "0.20"
 
 # Streaming for agent
 async-stream = "0.3"
+gix-url = "0.34.0"
 
 [dev-dependencies]
 mockall = "0.14"
