@@ -539,20 +539,34 @@ mod tests {
 
         // Test various URL formats that gix should support
         let test_cases = [
-            ("https://github.com/owner/repo.git", "github.com", "owner/repo"),
+            (
+                "https://github.com/owner/repo.git",
+                "github.com",
+                "owner/repo",
+            ),
             ("git@github.com:owner/repo.git", "github.com", "owner/repo"),
-            ("ssh://git@github.com/owner/repo.git", "github.com", "owner/repo"),
+            (
+                "ssh://git@github.com/owner/repo.git",
+                "github.com",
+                "owner/repo",
+            ),
         ];
 
         for (url_str, expected_host, expected_path) in test_cases {
-            let url = Url::try_from(url_str).unwrap_or_else(|_| panic!("Failed to parse: {}", url_str));
+            let url =
+                Url::try_from(url_str).unwrap_or_else(|_| panic!("Failed to parse: {}", url_str));
             assert_eq!(
                 url.host().map(|h| h.to_string()),
                 Some(expected_host.to_string()),
                 "Host mismatch for {}",
                 url_str
             );
-            let path = url.path.to_string().trim_start_matches('/').trim_end_matches(".git").to_string();
+            let path = url
+                .path
+                .to_string()
+                .trim_start_matches('/')
+                .trim_end_matches(".git")
+                .to_string();
             assert_eq!(path, expected_path, "Path mismatch for {}", url_str);
         }
     }
