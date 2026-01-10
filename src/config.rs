@@ -49,11 +49,17 @@ impl Config {
             config.log_level = val;
         }
 
-        if let Ok(val) = std::env::var("ISLANDS_REPOS_PATH") {
+        // Support both ISLANDS_REPOS_PATH and ISLANDS_STORAGE__REPOS_PATH
+        if let Ok(val) = std::env::var("ISLANDS_REPOS_PATH")
+            .or_else(|_| std::env::var("ISLANDS_STORAGE__REPOS_PATH"))
+        {
             config.indexer.repos_path = PathBuf::from(val);
         }
 
-        if let Ok(val) = std::env::var("ISLANDS_INDEXES_PATH") {
+        // Support both ISLANDS_INDEXES_PATH and ISLANDS_STORAGE__INDEXES_PATH
+        if let Ok(val) = std::env::var("ISLANDS_INDEXES_PATH")
+            .or_else(|_| std::env::var("ISLANDS_STORAGE__INDEXES_PATH"))
+        {
             config.indexer.indexes_path = PathBuf::from(val);
         }
 

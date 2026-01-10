@@ -166,9 +166,17 @@ impl EmbeddingConfig {
 
 impl Default for IndexerConfig {
     fn default() -> Self {
+        let base_path = directories::ProjectDirs::from("", "", "islands")
+            .map(|dirs| dirs.data_dir().to_path_buf())
+            .unwrap_or_else(|| {
+                directories::BaseDirs::new()
+                    .map(|d| d.home_dir().join(".islands"))
+                    .unwrap_or_else(|| PathBuf::from(".islands"))
+            });
+
         Self {
-            repos_path: PathBuf::from("/data/islands/repos"),
-            indexes_path: PathBuf::from("/data/islands/indexes"),
+            repos_path: base_path.join("repos"),
+            indexes_path: base_path.join("indexes"),
             max_concurrent_syncs: 4,
             sync_interval_secs: 300,
             index_extensions: vec![
@@ -889,8 +897,9 @@ mod tests {
     fn test_indexer_config_default() {
         let config = IndexerConfig::default();
 
-        assert_eq!(config.repos_path, PathBuf::from("/data/islands/repos"));
-        assert_eq!(config.indexes_path, PathBuf::from("/data/islands/indexes"));
+        // Paths should end with repos/indexes under an islands data directory
+        assert!(config.repos_path.ends_with("repos"));
+        assert!(config.indexes_path.ends_with("indexes"));
         assert_eq!(config.max_concurrent_syncs, 4);
         assert_eq!(config.sync_interval_secs, 300);
         assert!(config.index_extensions.contains(&"py".to_string()));

@@ -542,9 +542,13 @@ impl BaseProvider {
         }
 
         if status == reqwest::StatusCode::UNAUTHORIZED || status == reqwest::StatusCode::FORBIDDEN {
-            return Err(ProviderError::AuthenticationError(
-                "Authentication failed".to_string(),
-            ));
+            let message = response.text().await.unwrap_or_default();
+            let detail = if message.is_empty() {
+                "Authentication failed".to_string()
+            } else {
+                format!("Authentication failed: {}", message)
+            };
+            return Err(ProviderError::AuthenticationError(detail));
         }
 
         if status == reqwest::StatusCode::TOO_MANY_REQUESTS {
