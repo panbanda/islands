@@ -243,7 +243,11 @@ async fn main() -> anyhow::Result<()> {
             WorkspaceAction::Delete { name, force } => {
                 commands::workspace_delete(&config, &name, force).await?;
             }
-            WorkspaceAction::AddRepo { workspace, repo, token } => {
+            WorkspaceAction::AddRepo {
+                workspace,
+                repo,
+                token,
+            } => {
                 commands::workspace_add_repo(&config, &workspace, &repo, token.as_deref()).await?;
             }
             WorkspaceAction::RemoveRepo { workspace, repo_id } => {

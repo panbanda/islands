@@ -977,11 +977,7 @@ impl IndexerService {
             .map_err(|e| Error::IndexingFailed(format!("Failed to serialize workspace: {}", e)))?;
         std::fs::write(&workspace.path, &json)?;
 
-        info!(
-            "Added repository '{}' to workspace '{}'",
-            repo.id(),
-            name
-        );
+        info!("Added repository '{}' to workspace '{}'", repo.id(), name);
         Ok(())
     }
 
@@ -1006,11 +1002,7 @@ impl IndexerService {
             .map_err(|e| Error::IndexingFailed(format!("Failed to serialize workspace: {}", e)))?;
         std::fs::write(&workspace.path, &json)?;
 
-        info!(
-            "Removed repository '{}' from workspace '{}'",
-            repo_id,
-            name
-        );
+        info!("Removed repository '{}' from workspace '{}'", repo_id, name);
         Ok(())
     }
 
@@ -2459,7 +2451,10 @@ mod tests {
             "frontend",
             "https://github.com/org/frontend.git",
         );
-        service.create_workspace("my-project", &[repo1]).await.unwrap();
+        service
+            .create_workspace("my-project", &[repo1])
+            .await
+            .unwrap();
 
         // Add another repo to the workspace
         let repo2 = crate::providers::Repository::new(
@@ -2468,14 +2463,21 @@ mod tests {
             "backend",
             "https://github.com/org/backend.git",
         );
-        service.add_repo_to_workspace("my-project", &repo2).await.unwrap();
+        service
+            .add_repo_to_workspace("my-project", &repo2)
+            .await
+            .unwrap();
 
         // Verify workspace now has 2 repos
         let workspaces = service.list_workspaces().await;
         assert_eq!(workspaces.len(), 1);
         assert_eq!(workspaces[0].repositories.len(), 2);
 
-        let repo_names: Vec<_> = workspaces[0].repositories.iter().map(|r| r.name.as_str()).collect();
+        let repo_names: Vec<_> = workspaces[0]
+            .repositories
+            .iter()
+            .map(|r| r.name.as_str())
+            .collect();
         assert!(repo_names.contains(&"frontend"));
         assert!(repo_names.contains(&"backend"));
     }
@@ -2507,14 +2509,21 @@ mod tests {
                 "repo2",
                 "https://github.com/org/repo2.git",
             );
-            service.add_repo_to_workspace("test-ws", &repo2).await.unwrap();
+            service
+                .add_repo_to_workspace("test-ws", &repo2)
+                .await
+                .unwrap();
         }
 
         // New service should see the added repo
         let service2 = IndexerService::new(config, HashMap::new());
         let workspaces = service2.list_workspaces().await;
 
-        assert_eq!(workspaces[0].repositories.len(), 2, "Added repo should persist");
+        assert_eq!(
+            workspaces[0].repositories.len(),
+            2,
+            "Added repo should persist"
+        );
     }
 
     #[tokio::test]
@@ -2565,10 +2574,16 @@ mod tests {
                 "https://github.com/org/backend.git",
             ),
         ];
-        service.create_workspace("my-project", &repos).await.unwrap();
+        service
+            .create_workspace("my-project", &repos)
+            .await
+            .unwrap();
 
         // Remove one repo (repo.id() returns owner/name format)
-        service.remove_repo_from_workspace("my-project", "org/backend").await.unwrap();
+        service
+            .remove_repo_from_workspace("my-project", "org/backend")
+            .await
+            .unwrap();
 
         // Verify workspace now has 1 repo
         let workspaces = service.list_workspaces().await;
@@ -2604,14 +2619,21 @@ mod tests {
                 ),
             ];
             service.create_workspace("test-ws", &repos).await.unwrap();
-            service.remove_repo_from_workspace("test-ws", "org/repo2").await.unwrap();
+            service
+                .remove_repo_from_workspace("test-ws", "org/repo2")
+                .await
+                .unwrap();
         }
 
         // New service should see the removal
         let service2 = IndexerService::new(config, HashMap::new());
         let workspaces = service2.list_workspaces().await;
 
-        assert_eq!(workspaces[0].repositories.len(), 1, "Removal should persist");
+        assert_eq!(
+            workspaces[0].repositories.len(),
+            1,
+            "Removal should persist"
+        );
         assert_eq!(workspaces[0].repositories[0].name, "repo1");
     }
 
@@ -2634,7 +2656,9 @@ mod tests {
         );
         service.create_workspace("test-ws", &[repo]).await.unwrap();
 
-        let result = service.remove_repo_from_workspace("test-ws", "org/nonexistent").await;
+        let result = service
+            .remove_repo_from_workspace("test-ws", "org/nonexistent")
+            .await;
         assert!(result.is_err(), "Should fail for nonexistent repo");
     }
 
@@ -2656,7 +2680,10 @@ mod tests {
             "repo",
             "https://github.com/org/repo.git",
         );
-        service.create_workspace("to-delete", &[repo]).await.unwrap();
+        service
+            .create_workspace("to-delete", &[repo])
+            .await
+            .unwrap();
 
         // Verify it exists
         assert_eq!(service.list_workspaces().await.len(), 1);
@@ -2728,7 +2755,10 @@ mod tests {
                 "https://github.com/org/backend.git",
             ),
         ];
-        service.create_workspace("my-project", &repos).await.unwrap();
+        service
+            .create_workspace("my-project", &repos)
+            .await
+            .unwrap();
 
         // Get index names for workspace
         let names = service.get_workspace_index_names("my-project").await;

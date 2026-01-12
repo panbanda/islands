@@ -62,14 +62,20 @@ pub async fn search(
 
     // Resolve workspace to index names if specified
     let search_indexes = if let Some(ws_name) = workspace {
-        let ws_indexes = indexer.get_workspace_index_names(ws_name).await
-            .ok_or_else(|| crate::Error::InvalidArgument(format!("Workspace not found: {}", ws_name)))?;
+        let ws_indexes = indexer
+            .get_workspace_index_names(ws_name)
+            .await
+            .ok_or_else(|| {
+                crate::Error::InvalidArgument(format!("Workspace not found: {}", ws_name))
+            })?;
         Some(ws_indexes)
     } else {
         indexes
     };
 
-    let results = indexer.search(query, search_indexes.as_deref(), top_k).await?;
+    let results = indexer
+        .search(query, search_indexes.as_deref(), top_k)
+        .await?;
 
     if results.is_empty() {
         output::warning(&format!("No results found for: {}", query));
@@ -448,7 +454,10 @@ pub async fn workspace_add_repo(
     repo_url: &str,
     token: Option<&str>,
 ) -> Result<()> {
-    let spinner = output::spinner(&format!("Adding repository to workspace: {}", workspace_name));
+    let spinner = output::spinner(&format!(
+        "Adding repository to workspace: {}",
+        workspace_name
+    ));
 
     let (provider_type, owner, repo_name, base_url) = parse_repo_url(repo_url)?;
     let provider_type_str = format!("{:?}", provider_type).to_lowercase();
@@ -459,7 +468,10 @@ pub async fn workspace_add_repo(
     indexer.add_repo_to_workspace(workspace_name, &repo).await?;
     spinner.finish_and_clear();
 
-    output::success(&format!("Added {} to workspace: {}", repo.full_name, workspace_name));
+    output::success(&format!(
+        "Added {} to workspace: {}",
+        repo.full_name, workspace_name
+    ));
 
     Ok(())
 }
@@ -470,13 +482,21 @@ pub async fn workspace_remove_repo(
     workspace_name: &str,
     repo_id: &str,
 ) -> Result<()> {
-    let spinner = output::spinner(&format!("Removing repository from workspace: {}", workspace_name));
+    let spinner = output::spinner(&format!(
+        "Removing repository from workspace: {}",
+        workspace_name
+    ));
 
     let indexer = IndexerService::new(config.indexer.clone(), HashMap::new());
-    indexer.remove_repo_from_workspace(workspace_name, repo_id).await?;
+    indexer
+        .remove_repo_from_workspace(workspace_name, repo_id)
+        .await?;
     spinner.finish_and_clear();
 
-    output::success(&format!("Removed {} from workspace: {}", repo_id, workspace_name));
+    output::success(&format!(
+        "Removed {} from workspace: {}",
+        repo_id, workspace_name
+    ));
 
     Ok(())
 }
@@ -567,7 +587,14 @@ mod tests {
     async fn test_search_with_special_chars_query() {
         let (config, _dir) = test_config();
 
-        let result = search(&config, "fn main() { println!(\"hello\"); }", None, None, 10).await;
+        let result = search(
+            &config,
+            "fn main() { println!(\"hello\"); }",
+            None,
+            None,
+            10,
+        )
+        .await;
         assert!(result.is_ok());
     }
 
