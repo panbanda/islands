@@ -55,11 +55,27 @@ pub async fn search(
     config: &Config,
     query: &str,
     indexes: Option<Vec<String>>,
+    workspace: Option<&str>,
     top_k: usize,
 ) -> Result<()> {
     let indexer = IndexerService::new(config.indexer.clone(), HashMap::new());
 
-    let results = indexer.search(query, indexes.as_deref(), top_k).await?;
+    // Resolve workspace to index names if specified
+    let search_indexes = if let Some(ws_name) = workspace {
+        let ws_indexes = indexer
+            .get_workspace_index_names(ws_name)
+            .await
+            .ok_or_else(|| {
+                crate::Error::InvalidArgument(format!("Workspace not found: {}", ws_name))
+            })?;
+        Some(ws_indexes)
+    } else {
+        indexes
+    };
+
+    let results = indexer
+        .search(query, search_indexes.as_deref(), top_k)
+        .await?;
 
     if results.is_empty() {
         output::warning(&format!("No results found for: {}", query));
@@ -342,6 +358,149 @@ pub async fn config_init(output_path: Option<std::path::PathBuf>) -> Result<()> 
     Ok(())
 }
 
+/// Create a new workspace with one or more repositories
+pub async fn workspace_create(
+    config: &Config,
+    name: &str,
+    repo_urls: &[String],
+    token: Option<&str>,
+) -> Result<()> {
+    let spinner = output::spinner(&format!("Creating workspace: {}", name));
+
+    let indexer = IndexerService::new(config.indexer.clone(), HashMap::new());
+
+    let mut repos = Vec::new();
+    for url in repo_urls {
+        let (provider_type, owner, repo_name, base_url) = parse_repo_url(url)?;
+        let provider_type_str = format!("{:?}", provider_type).to_lowercase();
+        let provider = create_provider(&provider_type_str, base_url.as_deref(), token, None)?;
+        let repo = provider.get_repository(&owner, &repo_name).await?;
+        repos.push(repo);
+    }
+
+    let workspace = indexer.create_workspace(name, &repos).await?;
+    spinner.finish_and_clear();
+
+    output::success(&format!("Created workspace: {}", name));
+    println!("  Repositories: {}", workspace.repositories.len());
+    for repo in &workspace.repositories {
+        println!("    - {}", repo.full_name);
+    }
+
+    Ok(())
+}
+
+/// List all workspaces
+pub async fn workspace_list(config: &Config) -> Result<()> {
+    let indexer = IndexerService::new(config.indexer.clone(), HashMap::new());
+    let workspaces = indexer.list_workspaces().await;
+
+    if workspaces.is_empty() {
+        output::warning("No workspaces found. Use 'islands workspace create' to create one.");
+        return Ok(());
+    }
+
+    println!("\nIslands Workspaces\n");
+
+    for ws in workspaces {
+        println!(
+            "{} ({} repositories)",
+            console::style(&ws.name).cyan().bold(),
+            ws.repositories.len()
+        );
+        for repo in &ws.repositories {
+            println!("    - {}", repo.full_name);
+        }
+        println!("  Created: {}", ws.created_at);
+        println!("  Updated: {}", ws.updated_at);
+        println!();
+    }
+
+    Ok(())
+}
+
+/// Delete a workspace
+pub async fn workspace_delete(config: &Config, name: &str, force: bool) -> Result<()> {
+    let indexer = IndexerService::new(config.indexer.clone(), HashMap::new());
+
+    if !force {
+        output::warning(&format!("This will delete workspace '{}'.", name));
+        print!("Are you sure? (y/N): ");
+        std::io::Write::flush(&mut std::io::stdout())?;
+
+        let mut input = String::new();
+        std::io::stdin().read_line(&mut input)?;
+        let input = input.trim().to_lowercase();
+
+        if input != "y" && input != "yes" {
+            output::info("Aborted.");
+            return Ok(());
+        }
+    }
+
+    let spinner = output::spinner(&format!("Deleting workspace: {}", name));
+    indexer.delete_workspace(name).await?;
+    spinner.finish_and_clear();
+
+    output::success(&format!("Deleted workspace: {}", name));
+
+    Ok(())
+}
+
+/// Add a repository to an existing workspace
+pub async fn workspace_add_repo(
+    config: &Config,
+    workspace_name: &str,
+    repo_url: &str,
+    token: Option<&str>,
+) -> Result<()> {
+    let spinner = output::spinner(&format!(
+        "Adding repository to workspace: {}",
+        workspace_name
+    ));
+
+    let (provider_type, owner, repo_name, base_url) = parse_repo_url(repo_url)?;
+    let provider_type_str = format!("{:?}", provider_type).to_lowercase();
+    let provider = create_provider(&provider_type_str, base_url.as_deref(), token, None)?;
+    let repo = provider.get_repository(&owner, &repo_name).await?;
+
+    let indexer = IndexerService::new(config.indexer.clone(), HashMap::new());
+    indexer.add_repo_to_workspace(workspace_name, &repo).await?;
+    spinner.finish_and_clear();
+
+    output::success(&format!(
+        "Added {} to workspace: {}",
+        repo.full_name, workspace_name
+    ));
+
+    Ok(())
+}
+
+/// Remove a repository from a workspace
+pub async fn workspace_remove_repo(
+    config: &Config,
+    workspace_name: &str,
+    repo_id: &str,
+) -> Result<()> {
+    let spinner = output::spinner(&format!(
+        "Removing repository from workspace: {}",
+        workspace_name
+    ));
+
+    let indexer = IndexerService::new(config.indexer.clone(), HashMap::new());
+    indexer
+        .remove_repo_from_workspace(workspace_name, repo_id)
+        .await?;
+    spinner.finish_and_clear();
+
+    output::success(&format!(
+        "Removed {} from workspace: {}",
+        repo_id, workspace_name
+    ));
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -379,7 +538,7 @@ mod tests {
         let (config, _dir) = test_config();
 
         // Searching with no indexes should return Ok (with warning printed)
-        let result = search(&config, "test query", None, 10).await;
+        let result = search(&config, "test query", None, None, 10).await;
         assert!(result.is_ok());
     }
 
@@ -387,7 +546,7 @@ mod tests {
     async fn test_search_with_empty_query_returns_ok() {
         let (config, _dir) = test_config();
 
-        let result = search(&config, "", None, 10).await;
+        let result = search(&config, "", None, None, 10).await;
         assert!(result.is_ok());
     }
 
@@ -396,7 +555,7 @@ mod tests {
         let (config, _dir) = test_config();
 
         let indexes = vec!["nonexistent/repo".to_string()];
-        let result = search(&config, "query", Some(indexes), 5).await;
+        let result = search(&config, "query", Some(indexes), None, 5).await;
         assert!(result.is_ok());
     }
 
@@ -404,7 +563,7 @@ mod tests {
     async fn test_search_with_top_k_zero() {
         let (config, _dir) = test_config();
 
-        let result = search(&config, "test", None, 0).await;
+        let result = search(&config, "test", None, None, 0).await;
         assert!(result.is_ok());
     }
 
@@ -412,7 +571,7 @@ mod tests {
     async fn test_search_with_large_top_k() {
         let (config, _dir) = test_config();
 
-        let result = search(&config, "test", None, 10000).await;
+        let result = search(&config, "test", None, None, 10000).await;
         assert!(result.is_ok());
     }
 
@@ -420,7 +579,7 @@ mod tests {
     async fn test_search_with_unicode_query() {
         let (config, _dir) = test_config();
 
-        let result = search(&config, "unicode test", None, 10).await;
+        let result = search(&config, "unicode test", None, None, 10).await;
         assert!(result.is_ok());
     }
 
@@ -428,7 +587,14 @@ mod tests {
     async fn test_search_with_special_chars_query() {
         let (config, _dir) = test_config();
 
-        let result = search(&config, "fn main() { println!(\"hello\"); }", None, 10).await;
+        let result = search(
+            &config,
+            "fn main() { println!(\"hello\"); }",
+            None,
+            None,
+            10,
+        )
+        .await;
         assert!(result.is_ok());
     }
 
@@ -755,7 +921,7 @@ mod tests {
         // Multiple operations should work with same config
         let _ = show_status(&config).await;
         let _ = list_indexes(&config).await;
-        let _ = search(&config, "test", None, 10).await;
+        let _ = search(&config, "test", None, None, 10).await;
 
         // All should complete without panicking
     }
@@ -776,7 +942,7 @@ mod tests {
         let (config, _dir) = test_config();
 
         let empty_indexes: Vec<String> = vec![];
-        let result = search(&config, "query", Some(empty_indexes), 10).await;
+        let result = search(&config, "query", Some(empty_indexes), None, 10).await;
         assert!(result.is_ok());
     }
 
@@ -855,9 +1021,9 @@ mod tests {
         let config3 = config.clone();
 
         let (r1, r2, r3) = tokio::join!(
-            search(&config1, "query1", None, 5),
-            search(&config2, "query2", None, 5),
-            search(&config3, "query3", None, 5),
+            search(&config1, "query1", None, None, 5),
+            search(&config2, "query2", None, None, 5),
+            search(&config3, "query3", None, None, 5),
         );
 
         assert!(r1.is_ok());
@@ -893,7 +1059,7 @@ mod tests {
         assert!(list_indexes(&config).await.is_ok());
 
         // Search (empty)
-        assert!(search(&config, "test", None, 10).await.is_ok());
+        assert!(search(&config, "test", None, None, 10).await.is_ok());
 
         // Sync non-existent (error)
         assert!(sync_repository(&config, "nonexistent").await.is_err());

@@ -1,7 +1,7 @@
 //! Main indexer service
 
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
@@ -37,6 +37,21 @@ pub struct IndexInfo {
     pub file_count: usize,
     /// Index size in bytes
     pub size_bytes: u64,
+}
+
+/// Information about a workspace (multi-repo index)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorkspaceInfo {
+    /// Workspace name
+    pub name: String,
+    /// Path to workspace metadata
+    pub path: PathBuf,
+    /// Source repositories in this workspace
+    pub repositories: Vec<Repository>,
+    /// When the workspace was created
+    pub created_at: DateTime<Utc>,
+    /// When the workspace was last updated
+    pub updated_at: DateTime<Utc>,
 }
 
 /// Configuration for the indexer service
@@ -210,6 +225,8 @@ pub struct IndexerService {
     indexes: RwLock<HashMap<String, IndexInfo>>,
     /// Stored HNSW graphs with file metadata
     graphs: RwLock<HashMap<String, StoredIndex>>,
+    /// Workspaces (multi-repo indexes)
+    workspaces: RwLock<HashMap<String, WorkspaceInfo>>,
     running: RwLock<bool>,
     #[cfg(feature = "embeddings")]
     embedder: Option<Arc<EmbedderProvider>>,
@@ -228,15 +245,102 @@ impl IndexerService {
             config.max_concurrent_syncs,
         );
 
+        // Load persisted indexes from disk
+        let indexes = Self::load_indexes_from_disk(&config.indexes_path);
+        let workspaces = Self::load_workspaces_from_disk(&config.indexes_path);
+
+        if !indexes.is_empty() {
+            info!("Loaded {} persisted indexes from disk", indexes.len());
+        }
+        if !workspaces.is_empty() {
+            info!("Loaded {} persisted workspaces from disk", workspaces.len());
+        }
+
         Self {
             config,
             repo_manager,
-            indexes: RwLock::new(HashMap::new()),
+            indexes: RwLock::new(indexes),
             graphs: RwLock::new(HashMap::new()),
+            workspaces: RwLock::new(workspaces),
             running: RwLock::new(false),
             #[cfg(feature = "embeddings")]
             embedder: None,
         }
+    }
+
+    /// Load indexes from disk by scanning for metadata.json files
+    fn load_indexes_from_disk(indexes_path: &Path) -> HashMap<String, IndexInfo> {
+        let mut indexes = HashMap::new();
+
+        // Walk through the indexes directory looking for metadata.json files
+        if let Ok(entries) = std::fs::read_dir(indexes_path) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    // Recursively search provider directories (e.g., github/)
+                    Self::scan_provider_dir(&path, &mut indexes);
+                }
+            }
+        }
+
+        indexes
+    }
+
+    /// Scan a provider directory for index metadata
+    fn scan_provider_dir(provider_path: &Path, indexes: &mut HashMap<String, IndexInfo>) {
+        if let Ok(entries) = std::fs::read_dir(provider_path) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    // This could be owner/ directory
+                    Self::scan_owner_dir(&path, indexes);
+                }
+            }
+        }
+    }
+
+    /// Scan an owner directory for index metadata
+    fn scan_owner_dir(owner_path: &Path, indexes: &mut HashMap<String, IndexInfo>) {
+        if let Ok(entries) = std::fs::read_dir(owner_path) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    // This could be repo/ directory - check for metadata.json
+                    let metadata_path = path.join("metadata.json");
+                    if metadata_path.exists() {
+                        if let Ok(content) = std::fs::read_to_string(&metadata_path) {
+                            if let Ok(info) = serde_json::from_str::<IndexInfo>(&content) {
+                                indexes.insert(info.name.clone(), info);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Load workspaces from disk
+    fn load_workspaces_from_disk(indexes_path: &Path) -> HashMap<String, WorkspaceInfo> {
+        let mut workspaces = HashMap::new();
+        let workspaces_dir = indexes_path.join("workspaces");
+
+        if let Ok(entries) = std::fs::read_dir(&workspaces_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    let workspace_file = path.join("workspace.json");
+                    if workspace_file.exists() {
+                        if let Ok(content) = std::fs::read_to_string(&workspace_file) {
+                            if let Ok(workspace) = serde_json::from_str::<WorkspaceInfo>(&content) {
+                                workspaces.insert(workspace.name.clone(), workspace);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        workspaces
     }
 
     /// Initialize the embedding model asynchronously.
@@ -487,9 +591,14 @@ impl IndexerService {
             graphs.insert(info.name.clone(), stored);
         }
 
-        // Store index info
-        let mut indexes = self.indexes.write().await;
-        indexes.insert(info.name.clone(), info.clone());
+        // Store index info in memory
+        {
+            let mut indexes = self.indexes.write().await;
+            indexes.insert(info.name.clone(), info.clone());
+        }
+
+        // Persist index metadata to disk
+        self.save_index_metadata(&info).await?;
 
         info!("Indexed {}: {} files", repo.id(), file_count);
         Ok(info)
@@ -761,6 +870,157 @@ impl IndexerService {
         }
 
         info!("Successfully deleted index: {}", name);
+        Ok(())
+    }
+
+    /// Save index metadata to disk
+    pub async fn save_index_metadata(&self, info: &IndexInfo) -> Result<()> {
+        // Create the index directory structure
+        let index_dir = if let Some(parent) = info.path.parent() {
+            parent.to_path_buf()
+        } else {
+            // Fall back to constructing path from index name
+            let parts: Vec<&str> = info.name.split('/').collect();
+            if parts.len() >= 3 {
+                self.config
+                    .indexes_path
+                    .join(parts[0])
+                    .join(parts[1])
+                    .join(parts[2])
+            } else {
+                self.config.indexes_path.join(&info.name)
+            }
+        };
+
+        std::fs::create_dir_all(&index_dir)?;
+
+        let metadata_path = index_dir.join("metadata.json");
+        let json = serde_json::to_string_pretty(info)
+            .map_err(|e| Error::IndexingFailed(format!("Failed to serialize metadata: {}", e)))?;
+        std::fs::write(&metadata_path, json)?;
+
+        info!("Saved index metadata to {:?}", metadata_path);
+        Ok(())
+    }
+
+    /// Create a workspace containing multiple repositories
+    pub async fn create_workspace(
+        &self,
+        name: &str,
+        repos: &[Repository],
+    ) -> Result<WorkspaceInfo> {
+        let workspace_dir = self.config.indexes_path.join("workspaces").join(name);
+        std::fs::create_dir_all(&workspace_dir)?;
+
+        let workspace = WorkspaceInfo {
+            name: name.to_string(),
+            path: workspace_dir.join("workspace.json"),
+            repositories: repos.to_vec(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        // Save workspace metadata to disk
+        let json = serde_json::to_string_pretty(&workspace)
+            .map_err(|e| Error::IndexingFailed(format!("Failed to serialize workspace: {}", e)))?;
+        std::fs::write(&workspace.path, &json)?;
+
+        // Add to in-memory map
+        {
+            let mut workspaces = self.workspaces.write().await;
+            workspaces.insert(name.to_string(), workspace.clone());
+        }
+
+        info!(
+            "Created workspace '{}' with {} repositories",
+            name,
+            repos.len()
+        );
+        Ok(workspace)
+    }
+
+    /// List all workspaces
+    pub async fn list_workspaces(&self) -> Vec<WorkspaceInfo> {
+        let workspaces = self.workspaces.read().await;
+        workspaces.values().cloned().collect()
+    }
+
+    /// Get a specific workspace
+    pub async fn get_workspace(&self, name: &str) -> Option<WorkspaceInfo> {
+        let workspaces = self.workspaces.read().await;
+        workspaces.get(name).cloned()
+    }
+
+    /// Get index names for all repositories in a workspace
+    pub async fn get_workspace_index_names(&self, name: &str) -> Option<Vec<String>> {
+        let workspaces = self.workspaces.read().await;
+        workspaces.get(name).map(|ws| {
+            ws.repositories
+                .iter()
+                .map(|repo| format!("{}/{}", repo.provider, repo.full_name))
+                .collect()
+        })
+    }
+
+    /// Add a repository to an existing workspace
+    pub async fn add_repo_to_workspace(&self, name: &str, repo: &Repository) -> Result<()> {
+        let mut workspaces = self.workspaces.write().await;
+        let workspace = workspaces
+            .get_mut(name)
+            .ok_or_else(|| Error::workspace_not_found(name))?;
+
+        workspace.repositories.push(repo.clone());
+        workspace.updated_at = Utc::now();
+
+        // Persist to disk
+        let json = serde_json::to_string_pretty(&*workspace)
+            .map_err(|e| Error::IndexingFailed(format!("Failed to serialize workspace: {}", e)))?;
+        std::fs::write(&workspace.path, &json)?;
+
+        info!("Added repository '{}' to workspace '{}'", repo.id(), name);
+        Ok(())
+    }
+
+    /// Remove a repository from a workspace
+    pub async fn remove_repo_from_workspace(&self, name: &str, repo_id: &str) -> Result<()> {
+        let mut workspaces = self.workspaces.write().await;
+        let workspace = workspaces
+            .get_mut(name)
+            .ok_or_else(|| Error::workspace_not_found(name))?;
+
+        let original_len = workspace.repositories.len();
+        workspace.repositories.retain(|r| r.id() != repo_id);
+
+        if workspace.repositories.len() == original_len {
+            return Err(Error::repo_not_in_workspace(repo_id));
+        }
+
+        workspace.updated_at = Utc::now();
+
+        // Persist to disk
+        let json = serde_json::to_string_pretty(&*workspace)
+            .map_err(|e| Error::IndexingFailed(format!("Failed to serialize workspace: {}", e)))?;
+        std::fs::write(&workspace.path, &json)?;
+
+        info!("Removed repository '{}' from workspace '{}'", repo_id, name);
+        Ok(())
+    }
+
+    /// Delete a workspace
+    pub async fn delete_workspace(&self, name: &str) -> Result<()> {
+        let mut workspaces = self.workspaces.write().await;
+
+        let workspace = workspaces
+            .remove(name)
+            .ok_or_else(|| Error::workspace_not_found(name))?;
+
+        // Remove workspace directory from disk
+        let workspace_dir = workspace.path.parent().unwrap_or(&workspace.path);
+        if workspace_dir.exists() {
+            std::fs::remove_dir_all(workspace_dir)?;
+        }
+
+        info!("Deleted workspace '{}'", name);
         Ok(())
     }
 
@@ -1963,5 +2223,553 @@ mod tests {
             let graphs = service.graphs.read().await;
             assert!(!graphs.contains_key(index_name));
         }
+    }
+
+    // =========================================================================
+    // Index Persistence Tests (TDD - these tests drive the implementation)
+    // =========================================================================
+
+    #[tokio::test]
+    async fn test_new_service_loads_persisted_indexes() {
+        let dir = tempdir().unwrap();
+        let config = IndexerConfig {
+            repos_path: dir.path().join("repos"),
+            indexes_path: dir.path().join("indexes"),
+            ..Default::default()
+        };
+
+        // Create index directories
+        let index_dir = config
+            .indexes_path
+            .join("github")
+            .join("owner")
+            .join("repo");
+        std::fs::create_dir_all(&index_dir).unwrap();
+
+        // Write index metadata to disk
+        let repo = crate::providers::Repository::new(
+            "github",
+            "owner",
+            "repo",
+            "https://github.com/owner/repo.git",
+        );
+        let info = IndexInfo {
+            name: "github/owner/repo".to_string(),
+            path: index_dir.join("index.leann"),
+            repository: repo,
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+            file_count: 42,
+            size_bytes: 1024,
+        };
+
+        // Save metadata file
+        let metadata_path = index_dir.join("metadata.json");
+        let json = serde_json::to_string_pretty(&info).unwrap();
+        std::fs::write(&metadata_path, json).unwrap();
+
+        // Create a NEW service - it should load the persisted index
+        let service = IndexerService::new(config, HashMap::new());
+        let indexes = service.list_indexes().await;
+
+        // This assertion will FAIL until we implement persistence loading
+        assert_eq!(indexes.len(), 1, "Expected 1 persisted index to be loaded");
+        assert_eq!(indexes[0].name, "github/owner/repo");
+        assert_eq!(indexes[0].file_count, 42);
+    }
+
+    #[tokio::test]
+    async fn test_save_index_persists_metadata_to_disk() {
+        // Test that save_index_metadata writes to disk correctly
+        let dir = tempdir().unwrap();
+        let config = IndexerConfig {
+            repos_path: dir.path().join("repos"),
+            indexes_path: dir.path().join("indexes"),
+            ..Default::default()
+        };
+
+        let service = IndexerService::new(config.clone(), HashMap::new());
+
+        let repo = crate::providers::Repository::new(
+            "github",
+            "test",
+            "myrepo",
+            "https://github.com/test/myrepo.git",
+        );
+
+        let info = IndexInfo {
+            name: "github/test/myrepo".to_string(),
+            path: config
+                .indexes_path
+                .join("github")
+                .join("test")
+                .join("myrepo")
+                .join("index.leann"),
+            repository: repo,
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+            file_count: 100,
+            size_bytes: 2048,
+        };
+
+        // Call save_index_metadata (method we need to implement)
+        service.save_index_metadata(&info).await.unwrap();
+
+        // Verify metadata file exists
+        let metadata_path = config
+            .indexes_path
+            .join("github")
+            .join("test")
+            .join("myrepo")
+            .join("metadata.json");
+
+        assert!(
+            metadata_path.exists(),
+            "Index metadata should be persisted to disk"
+        );
+
+        // Verify metadata content
+        let content = std::fs::read_to_string(&metadata_path).unwrap();
+        let loaded: IndexInfo = serde_json::from_str(&content).unwrap();
+        assert_eq!(loaded.name, "github/test/myrepo");
+        assert_eq!(loaded.file_count, 100);
+    }
+
+    // =========================================================================
+    // Multi-repo Index Tests (TDD - these tests drive the implementation)
+    // =========================================================================
+
+    #[tokio::test]
+    async fn test_create_workspace_index_with_multiple_repos() {
+        let dir = tempdir().unwrap();
+        let config = IndexerConfig {
+            repos_path: dir.path().join("repos"),
+            indexes_path: dir.path().join("indexes"),
+            ..Default::default()
+        };
+
+        let service = IndexerService::new(config.clone(), HashMap::new());
+
+        // Create workspace with multiple repos
+        let repos = vec![
+            crate::providers::Repository::new(
+                "github",
+                "org",
+                "frontend",
+                "https://github.com/org/frontend.git",
+            ),
+            crate::providers::Repository::new(
+                "github",
+                "org",
+                "backend",
+                "https://github.com/org/backend.git",
+            ),
+            crate::providers::Repository::new(
+                "github",
+                "org",
+                "shared",
+                "https://github.com/org/shared.git",
+            ),
+        ];
+
+        // Create a workspace index that combines all repos
+        let workspace_name = "my-project";
+        service
+            .create_workspace(workspace_name, &repos)
+            .await
+            .unwrap();
+
+        // Verify workspace is listed
+        let workspaces = service.list_workspaces().await;
+        assert_eq!(workspaces.len(), 1);
+        assert_eq!(workspaces[0].name, workspace_name);
+        assert_eq!(workspaces[0].repositories.len(), 3);
+    }
+
+    #[tokio::test]
+    async fn test_workspace_persists_and_loads() {
+        let dir = tempdir().unwrap();
+        let config = IndexerConfig {
+            repos_path: dir.path().join("repos"),
+            indexes_path: dir.path().join("indexes"),
+            ..Default::default()
+        };
+
+        // Create workspace with first service instance
+        {
+            let service = IndexerService::new(config.clone(), HashMap::new());
+
+            let repos = vec![
+                crate::providers::Repository::new(
+                    "github",
+                    "org",
+                    "repo1",
+                    "https://github.com/org/repo1.git",
+                ),
+                crate::providers::Repository::new(
+                    "github",
+                    "org",
+                    "repo2",
+                    "https://github.com/org/repo2.git",
+                ),
+            ];
+
+            service
+                .create_workspace("workspace1", &repos)
+                .await
+                .unwrap();
+        }
+
+        // Create NEW service - workspace should be loaded from disk
+        let service2 = IndexerService::new(config, HashMap::new());
+        let workspaces = service2.list_workspaces().await;
+
+        assert_eq!(
+            workspaces.len(),
+            1,
+            "Workspace should persist across service restarts"
+        );
+        assert_eq!(workspaces[0].name, "workspace1");
+        assert_eq!(workspaces[0].repositories.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_add_repo_to_workspace() {
+        let dir = tempdir().unwrap();
+        let config = IndexerConfig {
+            repos_path: dir.path().join("repos"),
+            indexes_path: dir.path().join("indexes"),
+            ..Default::default()
+        };
+
+        let service = IndexerService::new(config, HashMap::new());
+
+        // Create workspace with one repo
+        let repo1 = crate::providers::Repository::new(
+            "github",
+            "org",
+            "frontend",
+            "https://github.com/org/frontend.git",
+        );
+        service
+            .create_workspace("my-project", &[repo1])
+            .await
+            .unwrap();
+
+        // Add another repo to the workspace
+        let repo2 = crate::providers::Repository::new(
+            "github",
+            "org",
+            "backend",
+            "https://github.com/org/backend.git",
+        );
+        service
+            .add_repo_to_workspace("my-project", &repo2)
+            .await
+            .unwrap();
+
+        // Verify workspace now has 2 repos
+        let workspaces = service.list_workspaces().await;
+        assert_eq!(workspaces.len(), 1);
+        assert_eq!(workspaces[0].repositories.len(), 2);
+
+        let repo_names: Vec<_> = workspaces[0]
+            .repositories
+            .iter()
+            .map(|r| r.name.as_str())
+            .collect();
+        assert!(repo_names.contains(&"frontend"));
+        assert!(repo_names.contains(&"backend"));
+    }
+
+    #[tokio::test]
+    async fn test_add_repo_to_workspace_persists() {
+        let dir = tempdir().unwrap();
+        let config = IndexerConfig {
+            repos_path: dir.path().join("repos"),
+            indexes_path: dir.path().join("indexes"),
+            ..Default::default()
+        };
+
+        // Create workspace and add repo
+        {
+            let service = IndexerService::new(config.clone(), HashMap::new());
+
+            let repo1 = crate::providers::Repository::new(
+                "github",
+                "org",
+                "repo1",
+                "https://github.com/org/repo1.git",
+            );
+            service.create_workspace("test-ws", &[repo1]).await.unwrap();
+
+            let repo2 = crate::providers::Repository::new(
+                "github",
+                "org",
+                "repo2",
+                "https://github.com/org/repo2.git",
+            );
+            service
+                .add_repo_to_workspace("test-ws", &repo2)
+                .await
+                .unwrap();
+        }
+
+        // New service should see the added repo
+        let service2 = IndexerService::new(config, HashMap::new());
+        let workspaces = service2.list_workspaces().await;
+
+        assert_eq!(
+            workspaces[0].repositories.len(),
+            2,
+            "Added repo should persist"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_add_repo_to_nonexistent_workspace_fails() {
+        let dir = tempdir().unwrap();
+        let config = IndexerConfig {
+            repos_path: dir.path().join("repos"),
+            indexes_path: dir.path().join("indexes"),
+            ..Default::default()
+        };
+
+        let service = IndexerService::new(config, HashMap::new());
+
+        let repo = crate::providers::Repository::new(
+            "github",
+            "org",
+            "repo",
+            "https://github.com/org/repo.git",
+        );
+
+        let result = service.add_repo_to_workspace("nonexistent", &repo).await;
+        assert!(result.is_err(), "Should fail for nonexistent workspace");
+    }
+
+    #[tokio::test]
+    async fn test_remove_repo_from_workspace() {
+        let dir = tempdir().unwrap();
+        let config = IndexerConfig {
+            repos_path: dir.path().join("repos"),
+            indexes_path: dir.path().join("indexes"),
+            ..Default::default()
+        };
+
+        let service = IndexerService::new(config, HashMap::new());
+
+        // Create workspace with two repos
+        let repos = vec![
+            crate::providers::Repository::new(
+                "github",
+                "org",
+                "frontend",
+                "https://github.com/org/frontend.git",
+            ),
+            crate::providers::Repository::new(
+                "github",
+                "org",
+                "backend",
+                "https://github.com/org/backend.git",
+            ),
+        ];
+        service
+            .create_workspace("my-project", &repos)
+            .await
+            .unwrap();
+
+        // Remove one repo (repo.id() returns owner/name format)
+        service
+            .remove_repo_from_workspace("my-project", "org/backend")
+            .await
+            .unwrap();
+
+        // Verify workspace now has 1 repo
+        let workspaces = service.list_workspaces().await;
+        assert_eq!(workspaces[0].repositories.len(), 1);
+        assert_eq!(workspaces[0].repositories[0].name, "frontend");
+    }
+
+    #[tokio::test]
+    async fn test_remove_repo_from_workspace_persists() {
+        let dir = tempdir().unwrap();
+        let config = IndexerConfig {
+            repos_path: dir.path().join("repos"),
+            indexes_path: dir.path().join("indexes"),
+            ..Default::default()
+        };
+
+        // Create workspace with 2 repos, then remove one
+        {
+            let service = IndexerService::new(config.clone(), HashMap::new());
+
+            let repos = vec![
+                crate::providers::Repository::new(
+                    "github",
+                    "org",
+                    "repo1",
+                    "https://github.com/org/repo1.git",
+                ),
+                crate::providers::Repository::new(
+                    "github",
+                    "org",
+                    "repo2",
+                    "https://github.com/org/repo2.git",
+                ),
+            ];
+            service.create_workspace("test-ws", &repos).await.unwrap();
+            service
+                .remove_repo_from_workspace("test-ws", "org/repo2")
+                .await
+                .unwrap();
+        }
+
+        // New service should see the removal
+        let service2 = IndexerService::new(config, HashMap::new());
+        let workspaces = service2.list_workspaces().await;
+
+        assert_eq!(
+            workspaces[0].repositories.len(),
+            1,
+            "Removal should persist"
+        );
+        assert_eq!(workspaces[0].repositories[0].name, "repo1");
+    }
+
+    #[tokio::test]
+    async fn test_remove_nonexistent_repo_from_workspace_fails() {
+        let dir = tempdir().unwrap();
+        let config = IndexerConfig {
+            repos_path: dir.path().join("repos"),
+            indexes_path: dir.path().join("indexes"),
+            ..Default::default()
+        };
+
+        let service = IndexerService::new(config, HashMap::new());
+
+        let repo = crate::providers::Repository::new(
+            "github",
+            "org",
+            "repo1",
+            "https://github.com/org/repo1.git",
+        );
+        service.create_workspace("test-ws", &[repo]).await.unwrap();
+
+        let result = service
+            .remove_repo_from_workspace("test-ws", "org/nonexistent")
+            .await;
+        assert!(result.is_err(), "Should fail for nonexistent repo");
+    }
+
+    #[tokio::test]
+    async fn test_delete_workspace() {
+        let dir = tempdir().unwrap();
+        let config = IndexerConfig {
+            repos_path: dir.path().join("repos"),
+            indexes_path: dir.path().join("indexes"),
+            ..Default::default()
+        };
+
+        let service = IndexerService::new(config.clone(), HashMap::new());
+
+        // Create workspace
+        let repo = crate::providers::Repository::new(
+            "github",
+            "org",
+            "repo",
+            "https://github.com/org/repo.git",
+        );
+        service
+            .create_workspace("to-delete", &[repo])
+            .await
+            .unwrap();
+
+        // Verify it exists
+        assert_eq!(service.list_workspaces().await.len(), 1);
+
+        // Delete it
+        service.delete_workspace("to-delete").await.unwrap();
+
+        // Verify it's gone
+        assert_eq!(service.list_workspaces().await.len(), 0);
+
+        // New service should also not see it
+        let service2 = IndexerService::new(config, HashMap::new());
+        assert_eq!(service2.list_workspaces().await.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_get_workspace() {
+        let dir = tempdir().unwrap();
+        let config = IndexerConfig {
+            repos_path: dir.path().join("repos"),
+            indexes_path: dir.path().join("indexes"),
+            ..Default::default()
+        };
+
+        let service = IndexerService::new(config, HashMap::new());
+
+        // Create workspace
+        let repo = crate::providers::Repository::new(
+            "github",
+            "org",
+            "repo",
+            "https://github.com/org/repo.git",
+        );
+        service.create_workspace("test-ws", &[repo]).await.unwrap();
+
+        // Get workspace should succeed
+        let ws = service.get_workspace("test-ws").await;
+        assert!(ws.is_some());
+        assert_eq!(ws.unwrap().name, "test-ws");
+
+        // Get nonexistent workspace should return None
+        let ws = service.get_workspace("nonexistent").await;
+        assert!(ws.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_get_workspace_index_names() {
+        let dir = tempdir().unwrap();
+        let config = IndexerConfig {
+            repos_path: dir.path().join("repos"),
+            indexes_path: dir.path().join("indexes"),
+            ..Default::default()
+        };
+
+        let service = IndexerService::new(config, HashMap::new());
+
+        // Create workspace with two repos
+        let repos = vec![
+            crate::providers::Repository::new(
+                "github",
+                "org",
+                "frontend",
+                "https://github.com/org/frontend.git",
+            ),
+            crate::providers::Repository::new(
+                "github",
+                "org",
+                "backend",
+                "https://github.com/org/backend.git",
+            ),
+        ];
+        service
+            .create_workspace("my-project", &repos)
+            .await
+            .unwrap();
+
+        // Get index names for workspace
+        let names = service.get_workspace_index_names("my-project").await;
+        assert!(names.is_some());
+        let names = names.unwrap();
+        assert_eq!(names.len(), 2);
+        assert!(names.contains(&"github/org/frontend".to_string()));
+        assert!(names.contains(&"github/org/backend".to_string()));
+
+        // Nonexistent workspace should return None
+        let names = service.get_workspace_index_names("nonexistent").await;
+        assert!(names.is_none());
     }
 }

@@ -28,6 +28,14 @@ pub enum Error {
     #[error("index not found: {0}")]
     IndexNotFound(String),
 
+    /// Workspace not found
+    #[error("workspace not found: {0}")]
+    WorkspaceNotFound(String),
+
+    /// Repository not in workspace
+    #[error("repository not in workspace: {0}")]
+    RepositoryNotInWorkspace(String),
+
     /// Indexing failed
     #[error("indexing failed: {0}")]
     IndexingFailed(String),
@@ -68,6 +76,18 @@ impl Error {
     #[must_use]
     pub fn index_not_found(name: impl Into<String>) -> Self {
         Self::IndexNotFound(name.into())
+    }
+
+    /// Create a workspace not found error
+    #[must_use]
+    pub fn workspace_not_found(name: impl Into<String>) -> Self {
+        Self::WorkspaceNotFound(name.into())
+    }
+
+    /// Create a repository not in workspace error
+    #[must_use]
+    pub fn repo_not_in_workspace(name: impl Into<String>) -> Self {
+        Self::RepositoryNotInWorkspace(name.into())
     }
 }
 

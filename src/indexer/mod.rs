@@ -20,13 +20,15 @@ pub mod watcher;
 
 pub use error::{Error, Result};
 pub use manager::RepositoryManager;
-pub use service::{IndexInfo, IndexerConfig, IndexerService, StoredIndex};
+pub use service::{IndexInfo, IndexerConfig, IndexerService, StoredIndex, WorkspaceInfo};
 pub use state::RepositoryState;
 
 /// Re-export commonly used types
 pub mod prelude {
     pub use super::error::{Error, Result};
     pub use super::manager::RepositoryManager;
-    pub use super::service::{IndexInfo, IndexerConfig, IndexerService, StoredIndex};
+    pub use super::service::{
+        IndexInfo, IndexerConfig, IndexerService, StoredIndex, WorkspaceInfo,
+    };
     pub use super::state::RepositoryState;
 }
