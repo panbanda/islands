@@ -156,7 +156,7 @@ test-case = "3.3"
 assert_matches = "1.5"
 insta = "1.46"
 tracing-test = "0.2"
-tokio-test = "0.4"
+tokio-test = "0.4.5"
 assert_cmd = "2.1"
 predicates = "3.1"
 
