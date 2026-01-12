@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.4.1](https://github.com/panbanda/islands/compare/islands-v1.4.0...islands-v1.4.1) (2026-01-12)
+
+
+### Bug Fixes
+
+* correct index path structure for metadata persistence ([259a169](https://github.com/panbanda/islands/commit/259a16908f70df0e7be5a0e8bc82bc5e9ecf2dfc))
+* correct index path structure for metadata persistence ([a3a7f31](https://github.com/panbanda/islands/commit/a3a7f31dcf92663b73db8abd7b37fb7d6769e257))
+
 ## [1.4.0](https://github.com/panbanda/islands/compare/islands-v1.3.1...islands-v1.4.0) (2026-01-12)
 
 
