@@ -450,7 +450,8 @@ impl IndexerService {
             .indexes_path
             .join(&repo.provider)
             .join(&repo.owner)
-            .join(format!("{}.leann", repo.name))
+            .join(&repo.name)
+            .join("index.leann")
     }
 
     /// Add and index a repository
@@ -570,7 +571,7 @@ impl IndexerService {
         let size_bytes = graph.len() as u64 * 4 * 384; // rough estimate: vectors * sizeof(f32) * dim
 
         let info = IndexInfo {
-            name: repo.id(),
+            name: format!("{}/{}", repo.provider, repo.full_name),
             path: index_path,
             repository: repo.clone(),
             created_at: Utc::now(),
@@ -1713,7 +1714,8 @@ mod tests {
         let path = service.index_path(&repo);
         assert!(path.to_string_lossy().contains("github"));
         assert!(path.to_string_lossy().contains("my-org"));
-        assert!(path.to_string_lossy().contains("my-repo.leann"));
+        assert!(path.to_string_lossy().contains("my-repo"));
+        assert!(path.to_string_lossy().contains("index.leann"));
     }
 
     #[tokio::test]
