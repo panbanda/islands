@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.4.0](https://github.com/panbanda/islands/compare/islands-v1.3.1...islands-v1.4.0) (2026-01-12)
+
+
+### Features
+
+* **indexer:** add workspace management for multi-repo grouping ([bd9d1ac](https://github.com/panbanda/islands/commit/bd9d1acff8b95072439f46f029c5f004d7cc10c7))
+* **indexer:** add workspace management for multi-repo grouping ([220a79e](https://github.com/panbanda/islands/commit/220a79e7696e389ae8afd14f28370c5ac0209c68))
+
+
+### Bug Fixes
+
+* **deps:** update serde ([#33](https://github.com/panbanda/islands/issues/33)) ([7787e08](https://github.com/panbanda/islands/commit/7787e08f792083635a7f3bd6e31963ee7cf8a009))
+
 ## [1.3.1](https://github.com/panbanda/islands/compare/islands-v1.3.0...islands-v1.3.1) (2026-01-10)
 
 
