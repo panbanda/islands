@@ -11,25 +11,25 @@
 //!
 //! # Example
 //!
-//! ```rust,no_run
-//! use crate::core::embedding::{EmbedderProvider, EmbedderConfig, ModelArchitecture};
+//! ```rust,ignore
+//! use islands::core::embedding::{EmbedderProvider, EmbedderConfig, ModelArchitecture};
 //!
-//! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-//! // Create a provider with a HuggingFace model
-//! let provider = EmbedderProvider::from_config(EmbedderConfig {
-//!     architecture: ModelArchitecture::Bert,
-//!     model_id: "BAAI/bge-small-en-v1.5".to_string(),
-//!     ..Default::default()
-//! }).await?;
+//! async fn example() -> Result<(), Box<dyn std::error::Error>> {
+//!     // Create a provider with a HuggingFace model
+//!     let provider = EmbedderProvider::from_config(EmbedderConfig {
+//!         architecture: ModelArchitecture::Bert,
+//!         model_id: "BAAI/bge-small-en-v1.5".to_string(),
+//!         ..Default::default()
+//!     }).await?;
 //!
-//! // Embed text
-//! let embeddings = provider.embed_texts(&["Hello world", "Rust is great"]).await?;
-//! # Ok(())
-//! # }
+//!     // Embed text
+//!     let embeddings = provider.embed_texts(&["Hello world", "Rust is great"]).await?;
+//!     Ok(())
+//! }
 //! ```
 
-use super::error::{CoreError, CoreResult};
 use crate::Embedding;
+use crate::core::error::{CoreError, CoreResult};
 use embed_anything::config::TextEmbedConfig;
 use embed_anything::embeddings::embed::{EmbedData, Embedder, EmbedderBuilder};
 use serde::{Deserialize, Serialize};
@@ -326,12 +326,7 @@ impl EmbedderProvider {
         // Convert EmbedData to our Embedding type
         let embeddings: Vec<Embedding> = results
             .into_iter()
-            .filter_map(|data| {
-                data.embedding
-                    .to_dense()
-                    .ok()
-                    .map(|vec| Embedding::new(vec))
-            })
+            .filter_map(|data| data.embedding.to_dense().ok().map(Embedding::new))
             .collect();
 
         Ok(embeddings)
@@ -452,7 +447,7 @@ impl EmbedderProvider {
 ///
 /// This allows `EmbedderProvider` to be used directly with `LeannIndex` for
 /// on-demand embedding recomputation during search.
-impl crate::leann::EmbeddingProvider for EmbedderProvider {
+impl crate::core::leann::EmbeddingProvider for EmbedderProvider {
     fn compute_embedding(&self, id: u64) -> CoreResult<Vec<f32>> {
         // For LEANN, we need the original text associated with this ID.
         // This is typically handled by the indexer, not the embedder.

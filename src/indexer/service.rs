@@ -624,7 +624,7 @@ impl IndexerService {
 
         // Process files in batches
         let batch_size = self.config.embedding.batch_size();
-        let total_batches = (files.len() + batch_size - 1) / batch_size;
+        let total_batches = files.len().div_ceil(batch_size);
 
         // Reset progress bar for embedding phase
         if let Some(pb) = progress {

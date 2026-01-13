@@ -35,7 +35,7 @@ name = "islands"
 path = "src/lib.rs"
 
 [features]
-default = ["mcp", "agent", "watch"]
+default = ["mcp", "agent", "watch", "embeddings"]
 mcp = []
 agent = []
 watch = ["notify"]
