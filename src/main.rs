@@ -80,10 +80,10 @@ enum Commands {
     /// List all indexed repositories
     List,
 
-    /// Sync and re-index a repository
+    /// Sync and re-index repositories (all if none specified)
     Sync {
-        /// Index name (provider/owner/repo)
-        index_name: String,
+        /// Index names to sync (syncs all if omitted)
+        index_names: Vec<String>,
     },
 
     /// Configuration management
@@ -222,8 +222,8 @@ async fn main() -> anyhow::Result<()> {
         Commands::List => {
             commands::list_indexes(&config).await?;
         }
-        Commands::Sync { index_name } => {
-            commands::sync_repository(&config, &index_name).await?;
+        Commands::Sync { index_names } => {
+            commands::sync_repositories(&config, &index_names).await?;
         }
         Commands::Config { action } => match action {
             ConfigAction::Show => {

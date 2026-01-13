@@ -144,40 +144,71 @@ pub async fn list_indexes(config: &Config) -> Result<()> {
     Ok(())
 }
 
-/// Sync a repository
-pub async fn sync_repository(config: &Config, index_name: &str) -> Result<()> {
-    let spinner = output::spinner(&format!("Syncing {}", index_name));
-
+/// Sync repositories (all if none specified)
+pub async fn sync_repositories(config: &Config, index_names: &[String]) -> Result<()> {
     let indexer = IndexerService::new(config.indexer.clone(), HashMap::new());
 
-    let info = indexer
-        .get_index(index_name)
-        .await
-        .ok_or_else(|| crate::Error::InvalidArgument(format!("Index not found: {}", index_name)))?;
+    // Get list of indexes to sync
+    let indexes_to_sync: Vec<_> = if index_names.is_empty() {
+        // Sync all indexes
+        indexer.list_indexes().await
+    } else {
+        // Sync specified indexes
+        let mut indexes = Vec::new();
+        for name in index_names {
+            match indexer.get_index(name).await {
+                Some(info) => indexes.push(info),
+                None => {
+                    output::error(&format!("Index not found: {}", name));
+                    return Err(crate::Error::InvalidArgument(format!(
+                        "Index not found: {}",
+                        name
+                    )));
+                }
+            }
+        }
+        indexes
+    };
 
-    // First update the repository
-    let state = indexer
-        .repository_manager()
-        .update_repository(&info.repository)
-        .await?;
-    spinner.finish_and_clear();
-
-    // Check if re-indexing is needed
-    if indexer
-        .repository_manager()
-        .needs_reindex(&info.repository)
-        .await
-    {
-        let progress = output::progress_bar(0, "Re-indexing files...");
-        indexer
-            .index_repository_with_progress(&info.repository, Some(&progress))
-            .await?;
-        progress.finish_and_clear();
+    if indexes_to_sync.is_empty() {
+        output::warning("No indexes found. Use 'islands add' to add repositories.");
+        return Ok(());
     }
 
-    output::success(&format!("Synced {}", index_name));
-    println!("  Commit: {}", state.last_commit.unwrap_or_default());
-    println!("  Indexed: {}", state.indexed);
+    let total = indexes_to_sync.len();
+    output::info(&format!(
+        "Syncing {} index{}",
+        total,
+        if total == 1 { "" } else { "es" }
+    ));
+
+    for (i, info) in indexes_to_sync.iter().enumerate() {
+        let spinner = output::spinner(&format!("[{}/{}] Syncing {}", i + 1, total, info.name));
+
+        // First update the repository
+        let state = indexer
+            .repository_manager()
+            .update_repository(&info.repository)
+            .await?;
+        spinner.finish_and_clear();
+
+        // Check if re-indexing is needed
+        if indexer
+            .repository_manager()
+            .needs_reindex(&info.repository)
+            .await
+        {
+            let progress = output::progress_bar(0, "Re-indexing files...");
+            indexer
+                .index_repository_with_progress(&info.repository, Some(&progress))
+                .await?;
+            progress.finish_and_clear();
+        }
+
+        output::success(&format!("Synced {}", info.name));
+        println!("  Commit: {}", state.last_commit.unwrap_or_default());
+        println!("  Indexed: {}", state.indexed);
+    }
 
     Ok(())
 }
@@ -678,7 +709,7 @@ mod tests {
     async fn test_sync_repository_nonexistent_index_returns_error() {
         let (config, _dir) = test_config();
 
-        let result = sync_repository(&config, "nonexistent/owner/repo").await;
+        let result = sync_repositories(&config, &["nonexistent/owner/repo".to_string()]).await;
 
         // Should fail because the index doesn't exist
         assert!(result.is_err());
@@ -690,7 +721,7 @@ mod tests {
     async fn test_sync_repository_with_empty_name() {
         let (config, _dir) = test_config();
 
-        let result = sync_repository(&config, "").await;
+        let result = sync_repositories(&config, &["".to_string()]).await;
         assert!(result.is_err());
     }
 
@@ -698,7 +729,8 @@ mod tests {
     async fn test_sync_repository_with_special_chars() {
         let (config, _dir) = test_config();
 
-        let result = sync_repository(&config, "github/test/repo-with-dashes").await;
+        let result =
+            sync_repositories(&config, &["github/test/repo-with-dashes".to_string()]).await;
         assert!(result.is_err()); // Index doesn't exist
     }
 
@@ -706,7 +738,7 @@ mod tests {
     async fn test_sync_repository_error_contains_index_name() {
         let (config, _dir) = test_config();
 
-        let result = sync_repository(&config, "test-index-name").await;
+        let result = sync_repositories(&config, &["test-index-name".to_string()]).await;
         let err = result.unwrap_err();
         let err_msg = err.to_string();
 
@@ -960,7 +992,7 @@ mod tests {
         ];
 
         for name in invalid_names {
-            let result = sync_repository(&config, name).await;
+            let result = sync_repositories(&config, &[name.to_string()]).await;
             assert!(result.is_err(), "Expected error for name: {}", name);
         }
     }
@@ -1062,7 +1094,11 @@ mod tests {
         assert!(search(&config, "test", None, None, 10).await.is_ok());
 
         // Sync non-existent (error)
-        assert!(sync_repository(&config, "nonexistent").await.is_err());
+        assert!(
+            sync_repositories(&config, &["nonexistent".to_string()])
+                .await
+                .is_err()
+        );
     }
 
     // =========================================================================
