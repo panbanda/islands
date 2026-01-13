@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.5.0](https://github.com/panbanda/islands/compare/islands-v1.4.2...islands-v1.5.0) (2026-01-13)
+
+
+### Features
+
+* sync all indexes by default ([e78e9b3](https://github.com/panbanda/islands/commit/e78e9b37e881a07a9b287fabca4a161d938f025b))
+* sync all indexes by default ([981a3a6](https://github.com/panbanda/islands/commit/981a3a6b46c9ee1c491341fed8a84fa7300cf10c))
+
 ## [1.4.2](https://github.com/panbanda/islands/compare/islands-v1.4.1...islands-v1.4.2) (2026-01-13)
 
 
