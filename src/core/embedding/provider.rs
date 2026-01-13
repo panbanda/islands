@@ -28,8 +28,8 @@
 //! # }
 //! ```
 
-use super::error::{CoreError, CoreResult};
 use crate::Embedding;
+use crate::core::error::{CoreError, CoreResult};
 use embed_anything::config::TextEmbedConfig;
 use embed_anything::embeddings::embed::{EmbedData, Embedder, EmbedderBuilder};
 use serde::{Deserialize, Serialize};
@@ -452,7 +452,7 @@ impl EmbedderProvider {
 ///
 /// This allows `EmbedderProvider` to be used directly with `LeannIndex` for
 /// on-demand embedding recomputation during search.
-impl crate::leann::EmbeddingProvider for EmbedderProvider {
+impl crate::core::leann::EmbeddingProvider for EmbedderProvider {
     fn compute_embedding(&self, id: u64) -> CoreResult<Vec<f32>> {
         // For LEANN, we need the original text associated with this ID.
         // This is typically handled by the indexer, not the embedder.
