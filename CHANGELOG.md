@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.4.2](https://github.com/panbanda/islands/compare/islands-v1.4.1...islands-v1.4.2) (2026-01-13)
+
+
+### Bug Fixes
+
+* correct module paths in embedding provider ([f386cc7](https://github.com/panbanda/islands/commit/f386cc75b4b355311ba27435715d5b33a7a4ba12))
+* enable embeddings by default for functional search ([0422815](https://github.com/panbanda/islands/commit/0422815a4e9cb4d8617592cb26f1967f2c3483b1))
+* ignore embedding provider doctest ([14b65e2](https://github.com/panbanda/islands/commit/14b65e2e5ee0e4efd8cc5c5a66eeef8d0cf53869))
+* include embeddings in default features ([6c3df5a](https://github.com/panbanda/islands/commit/6c3df5ab0f125fda2e4c2ed693e93e030dc608d4))
+* resolve clippy warnings exposed by embeddings feature ([b8c5735](https://github.com/panbanda/islands/commit/b8c573549207f191dc8e290f62522a790aa9a45c))
+
 ## [1.4.1](https://github.com/panbanda/islands/compare/islands-v1.4.0...islands-v1.4.1) (2026-01-12)
 
 
