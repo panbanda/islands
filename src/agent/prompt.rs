@@ -83,6 +83,7 @@ mod tests {
     use serde_json::json;
 
     #[test]
+    #[allow(clippy::const_is_empty)]
     fn test_default_system_prompt_exists() {
         assert!(!DEFAULT_SYSTEM_PROMPT.is_empty());
         assert!(DEFAULT_SYSTEM_PROMPT.contains("Islands"));

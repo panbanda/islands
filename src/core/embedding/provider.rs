@@ -326,12 +326,7 @@ impl EmbedderProvider {
         // Convert EmbedData to our Embedding type
         let embeddings: Vec<Embedding> = results
             .into_iter()
-            .filter_map(|data| {
-                data.embedding
-                    .to_dense()
-                    .ok()
-                    .map(|vec| Embedding::new(vec))
-            })
+            .filter_map(|data| data.embedding.to_dense().ok().map(Embedding::new))
             .collect();
 
         Ok(embeddings)
