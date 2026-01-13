@@ -11,21 +11,21 @@
 //!
 //! # Example
 //!
-//! ```rust,no_run
-//! use crate::core::embedding::{EmbedderProvider, EmbedderConfig, ModelArchitecture};
+//! ```rust,ignore
+//! use islands::core::embedding::{EmbedderProvider, EmbedderConfig, ModelArchitecture};
 //!
-//! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-//! // Create a provider with a HuggingFace model
-//! let provider = EmbedderProvider::from_config(EmbedderConfig {
-//!     architecture: ModelArchitecture::Bert,
-//!     model_id: "BAAI/bge-small-en-v1.5".to_string(),
-//!     ..Default::default()
-//! }).await?;
+//! async fn example() -> Result<(), Box<dyn std::error::Error>> {
+//!     // Create a provider with a HuggingFace model
+//!     let provider = EmbedderProvider::from_config(EmbedderConfig {
+//!         architecture: ModelArchitecture::Bert,
+//!         model_id: "BAAI/bge-small-en-v1.5".to_string(),
+//!         ..Default::default()
+//!     }).await?;
 //!
-//! // Embed text
-//! let embeddings = provider.embed_texts(&["Hello world", "Rust is great"]).await?;
-//! # Ok(())
-//! # }
+//!     // Embed text
+//!     let embeddings = provider.embed_texts(&["Hello world", "Rust is great"]).await?;
+//!     Ok(())
+//! }
 //! ```
 
 use crate::Embedding;
