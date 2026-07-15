@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.5.1](https://github.com/panbanda/islands/compare/islands-v1.5.0...islands-v1.5.1) (2026-07-15)
+
+
+### Bug Fixes
+
+* **deps:** update rust crate bincode to v3 ([#43](https://github.com/panbanda/islands/issues/43)) ([259a8cc](https://github.com/panbanda/islands/commit/259a8cce357caa4838d71a8ece689073124678d9))
+* **deps:** update rust crate tokio to 1.52.3 ([#47](https://github.com/panbanda/islands/issues/47)) ([e31ec6d](https://github.com/panbanda/islands/commit/e31ec6d67170a9431aaabaee25401f2e21529fda))
+
 ## [1.5.0](https://github.com/panbanda/islands/compare/islands-v1.4.2...islands-v1.5.0) (2026-01-13)
 
 
